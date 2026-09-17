@@ -1,0 +1,66 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements-windows.txt
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller packaging/tg_oxyfire_saver_win.spec --noconfirm --clean
+
+      - name: Stage release folder
+        shell: pwsh
+        run: |
+          $out = "dist/TG-Oxyfire-Saver-Windows"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item -Recurse "dist/TGOxyfireSaver/*" $out/
+          Copy-Item "README.md" $out/
+          Copy-Item "LICENSE" $out/
+          Copy-Item ".env.example" "$out/.env.example"
+          @"
+          TG Oxyfire Saver for Windows
+          1. Run TGOxyfireSaver.exe
+          2. Sign in with QR (Telegram → Settings → Devices)
+          3. WebView2 (Edge) is required — usually preinstalled on Windows 10/11
+          "@ | Set-Content -Encoding utf8 "$out/README-Windows.txt"
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist/TG-Oxyfire-Saver-Windows" -DestinationPath "dist/TG-Oxyfire-Saver-Windows.zip" -Force
+          Get-Item "dist/TG-Oxyfire-Saver-Windows.zip" | Format-List Name, Length
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TG-Oxyfire-Saver-Windows
+          path: dist/TG-Oxyfire-Saver-Windows.zip
+
+      - name: Attach to GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/TG-Oxyfire-Saver-Windows.zip
+          fail_on_unmatched_files: true

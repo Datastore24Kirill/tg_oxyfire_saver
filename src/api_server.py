@@ -1,15 +1,24 @@
-"""Локальный HTTP API для окна и menu bar."""
+"""Локальный HTTP API для окна и menu bar / tray."""
 
 from __future__ import annotations
 
-from flask import Flask, jsonify, request, send_from_directory
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+from flask import Flask, jsonify, request, send_from_directory
+
+from core.runtime import resource_dir, support_dir
+
+
+def _gui_folder() -> Path:
+    for candidate in (support_dir() / "gui", resource_dir() / "gui"):
+        if (candidate / "index.html").is_file():
+            return candidate
+    return support_dir() / "gui"
 
 
 def create_app(service) -> Flask:
-    app = Flask(__name__, static_folder=str(ROOT / "gui"), static_url_path="")
+    gui = _gui_folder()
+    app = Flask(__name__, static_folder=str(gui), static_url_path="")
 
     @app.get("/")
     def index():

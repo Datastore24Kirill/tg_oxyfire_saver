@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import threading
 import time
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from core.links import LINK_RE
@@ -16,8 +16,33 @@ if TYPE_CHECKING:
 
 def _clipboard_text() -> str:
     try:
+        if sys.platform == "darwin":
+            r = subprocess.run(
+                ["pbpaste"], capture_output=True, text=True, timeout=2
+            )
+            return r.stdout or ""
+        if sys.platform == "win32":
+            # Prefer PowerShell Get-Clipboard
+            r = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "Get-Clipboard -Raw",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if r.returncode == 0:
+                return r.stdout or ""
+            return ""
         r = subprocess.run(
-            ["pbpaste"], capture_output=True, text=True, timeout=2
+            ["xclip", "-selection", "clipboard", "-o"],
+            capture_output=True,
+            text=True,
+            timeout=2,
         )
         return r.stdout or ""
     except Exception:

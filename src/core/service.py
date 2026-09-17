@@ -34,14 +34,17 @@ from core.naming import (
 )
 from core.notify import mark_finder_label, notify, open_path, reveal_path
 from core.paths import DEFAULT_OUT, channel_out_dir, rollover_day_folders, safe_folder_name
+from core.runtime import ensure_support_layout, system_name
 from core.store import Store
 
-ROOT = Path(__file__).resolve().parent.parent
+# support_dir unused import removed — ensure_support_layout is enough
+ROOT = ensure_support_layout()
+os.chdir(ROOT)
 load_dotenv(ROOT / ".env")
 SESSION = ROOT / "tg_saver"
 THUMBS = ROOT / "core" / "thumbs"
 THUMBS.mkdir(parents=True, exist_ok=True)
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.4.0"
 APP_NAME = "TG Oxyfire Saver"
 
 
@@ -377,7 +380,7 @@ class DownloadService:
             int(api_id),
             api_hash,
             device_model="TG Oxyfire Saver",
-            system_version="macOS",
+            system_version=system_name(),
             app_version=APP_VERSION,
             lang_code="ru",
             system_lang_code="ru-RU",
@@ -1189,7 +1192,7 @@ class DownloadService:
                     int(api_id),
                     api_hash,
                     device_model="TG Oxyfire Saver",
-                    system_version="macOS",
+                    system_version=system_name(),
                     app_version=APP_VERSION,
                     lang_code="ru",
                     system_lang_code="ru-RU",
