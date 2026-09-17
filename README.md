@@ -1,8 +1,18 @@
-# TG Oxyfire Saver
+<p align="center">
+  <img src="docs/logo.png" alt="TG Oxyfire Saver" width="128" height="128" />
+</p>
 
+<h1 align="center">TG Oxyfire Saver</h1>
+
+<p align="center">
 macOS app to download Telegram media (video / photo / documents) with a queue, history, channel watchers, clipboard mode, and a menu bar icon.
+</p>
 
-**[Скачать для Mac (Release)](https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest)** · **[Download for Mac](https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest)**
+<p align="center">
+  <a href="https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest"><strong>Скачать для Mac</strong></a>
+  ·
+  <a href="https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest"><strong>Download for Mac</strong></a>
+</p>
 
 | | |
 |---|---|
@@ -26,13 +36,6 @@ Telegram auth is only sent to **official Telegram servers**, like a normal clien
 
 Local data: `~/Library/Application Support/TGVideoSaver/`  
 (`tg_saver.session`, `data/tg_saver.db`, thumbs, `app.log`)
-
-### API_ID / API_HASH — do I need my own?
-**No.** By default the app uses the **public Telegram Desktop** open-source credentials (`API_ID=2040`). That is the same approach many open-source Telegram clients use. You do **not** register anything on my.telegram.org.
-
-Installer creates  
-`~/Library/Application Support/TGVideoSaver/.env`  
-from `.env.example` automatically. Only change it if you want your own app keys (optional, advanced).
 
 ### Install (Mac app — recommended)
 1. Open the latest [Release](https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest)
@@ -65,13 +68,6 @@ Requires Python 3.12+ and Xcode CLT (for the menu bar helper).
 
 Данные: `~/Library/Application Support/TGVideoSaver/`  
 (`tg_saver.session`, `data/tg_saver.db`, превью, `app.log`)
-
-### API_ID / API_HASH — нужно ли регистрировать свои?
-**Нет.** По умолчанию используются **публичные ключи Telegram Desktop** из открытого исходного кода (`API_ID=2040`). Так делают многие open-source клиенты. Регистрироваться на my.telegram.org **не нужно**.
-
-Установщик сам создаёт  
-`~/Library/Application Support/TGVideoSaver/.env`  
-из `.env.example`. Менять файл имеет смысл только если хотите свои ключи приложения (опционально).
 
 ### Установка (приложение для Mac — рекомендуется)
 1. Откройте последний [Release](https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest)

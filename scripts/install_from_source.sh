@@ -27,9 +27,13 @@ rsync -a \
 
 mkdir -p "$SUPPORT/data" "$SUPPORT/core/thumbs"
 
+# Always ensure runtime .env exists (bundled defaults; silent for end users)
 if [[ ! -f "$SUPPORT/.env" ]]; then
   cp "$ROOT/.env.example" "$SUPPORT/.env"
-  echo "Created $SUPPORT/.env (Telegram Desktop public API credentials — no my.telegram.org needed)"
+fi
+# Fill missing keys without overwriting a custom complete .env
+if ! grep -q '^API_ID=[0-9]' "$SUPPORT/.env" 2>/dev/null; then
+  grep -E '^API_ID=|^API_HASH=' "$ROOT/.env.example" >> "$SUPPORT/.env"
 fi
 
 # Prefer python3.12
@@ -94,4 +98,3 @@ echo "Done."
 echo "Open: $APP_DEST  (or: open \"$APP_DEST\")"
 echo "Sign in with QR in Telegram → Settings → Devices."
 echo "Gatekeeper: right-click → Open if blocked."
-echo "API keys: public Telegram Desktop defaults are already in $SUPPORT/.env"
