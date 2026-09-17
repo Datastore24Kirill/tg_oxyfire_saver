@@ -27,15 +27,20 @@ Telegram auth is only sent to **official Telegram servers**, like a normal clien
 Local data: `~/Library/Application Support/TGVideoSaver/`  
 (`tg_saver.session`, `data/tg_saver.db`, thumbs, `app.log`)
 
+### API_ID / API_HASH — do I need my own?
+**No.** By default the app uses the **public Telegram Desktop** open-source credentials (`API_ID=2040`). That is the same approach many open-source Telegram clients use. You do **not** register anything on my.telegram.org.
+
+Installer creates  
+`~/Library/Application Support/TGVideoSaver/.env`  
+from `.env.example` automatically. Only change it if you want your own app keys (optional, advanced).
+
 ### Install (Mac app — recommended)
 1. Open the latest [Release](https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest)
 2. Download `TG-Oxyfire-Saver-macOS.zip`
 3. Unzip and run **`Install.command`** (double-click)
-4. Create API credentials at [my.telegram.org](https://my.telegram.org) → API development tools
-5. Put `API_ID` and `API_HASH` into  
-   `~/Library/Application Support/TGVideoSaver/.env`
-6. Open **TG Oxyfire Saver** from Applications (or Desktop after install)
-7. If Gatekeeper blocks it: right-click → **Open**
+4. Open **TG Oxyfire Saver** from Applications
+5. Sign in with QR (Telegram → Settings → Devices → Link Desktop Device)
+6. If Gatekeeper blocks it: right-click → **Open**
 
 ### Build from source
 ```bash
@@ -43,7 +48,7 @@ git clone https://github.com/Datastore24Kirill/tg_oxyfire_saver.git
 cd tg_oxyfire_saver
 bash scripts/install_from_source.sh
 ```
-Requires Python 3.12+, Xcode CLT (for the menu bar helper), and Telegram `API_ID` / `API_HASH`.
+Requires Python 3.12+ and Xcode CLT (for the menu bar helper).
 
 ---
 
@@ -61,15 +66,20 @@ Requires Python 3.12+, Xcode CLT (for the menu bar helper), and Telegram `API_ID
 Данные: `~/Library/Application Support/TGVideoSaver/`  
 (`tg_saver.session`, `data/tg_saver.db`, превью, `app.log`)
 
+### API_ID / API_HASH — нужно ли регистрировать свои?
+**Нет.** По умолчанию используются **публичные ключи Telegram Desktop** из открытого исходного кода (`API_ID=2040`). Так делают многие open-source клиенты. Регистрироваться на my.telegram.org **не нужно**.
+
+Установщик сам создаёт  
+`~/Library/Application Support/TGVideoSaver/.env`  
+из `.env.example`. Менять файл имеет смысл только если хотите свои ключи приложения (опционально).
+
 ### Установка (приложение для Mac — рекомендуется)
 1. Откройте последний [Release](https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest)
 2. Скачайте `TG-Oxyfire-Saver-macOS.zip`
 3. Распакуйте и запустите **`Install.command`**
-4. Получите ключи на [my.telegram.org](https://my.telegram.org) → API development tools
-5. Пропишите `API_ID` и `API_HASH` в  
-   `~/Library/Application Support/TGVideoSaver/.env`
-6. Запустите **TG Oxyfire Saver** из Программ
-7. Если macOS не открывает: ПКМ → **Открыть**
+4. Откройте **TG Oxyfire Saver** из Программ
+5. Войдите по QR (Telegram → Настройки → Устройства → Подключить устройство)
+6. Если macOS не открывает: ПКМ → **Открыть**
 
 ### Сборка из исходников
 ```bash
@@ -77,7 +87,7 @@ git clone https://github.com/Datastore24Kirill/tg_oxyfire_saver.git
 cd tg_oxyfire_saver
 bash scripts/install_from_source.sh
 ```
-Нужны Python 3.12+, Xcode CLT и `API_ID` / `API_HASH` от Telegram.
+Нужны Python 3.12+ и Xcode CLT.
 
 ---
 

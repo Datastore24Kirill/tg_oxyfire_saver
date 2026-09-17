@@ -29,7 +29,7 @@ mkdir -p "$SUPPORT/data" "$SUPPORT/core/thumbs"
 
 if [[ ! -f "$SUPPORT/.env" ]]; then
   cp "$ROOT/.env.example" "$SUPPORT/.env"
-  echo "Created $SUPPORT/.env — add your API_ID and API_HASH from https://my.telegram.org"
+  echo "Created $SUPPORT/.env (Telegram Desktop public API credentials — no my.telegram.org needed)"
 fi
 
 # Prefer python3.12
@@ -91,6 +91,7 @@ fi
 
 echo ""
 echo "Done."
-echo "1) Edit: $SUPPORT/.env  (API_ID / API_HASH)"
-echo "2) Open: $APP_DEST  (or run open \"$APP_DEST\")"
-echo "3) Gatekeeper: right-click → Open if blocked"
+echo "Open: $APP_DEST  (or: open \"$APP_DEST\")"
+echo "Sign in with QR in Telegram → Settings → Devices."
+echo "Gatekeeper: right-click → Open if blocked."
+echo "API keys: public Telegram Desktop defaults are already in $SUPPORT/.env"

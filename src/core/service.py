@@ -364,8 +364,12 @@ class DownloadService:
             pass
 
     async def _bootstrap(self) -> None:
-        api_id = os.getenv("API_ID", "").strip()
-        api_hash = os.getenv("API_HASH", "").strip()
+        # Default: public Telegram Desktop OSS credentials (no my.telegram.org needed).
+        api_id = os.getenv("API_ID", "2040").strip() or "2040"
+        api_hash = (
+            os.getenv("API_HASH", "b18441a1ff607e10a989891a5462e627").strip()
+            or "b18441a1ff607e10a989891a5462e627"
+        )
         if not api_id.isdigit() or not api_hash:
             raise RuntimeError("Нет API_ID/API_HASH в .env")
         self._client = TelegramClient(
