@@ -1,0 +1,6 @@
+telethon>=1.36
+python-dotenv>=1.0
+pywebview>=5.0
+qrcode[pil]>=7.4
+flask>=3.0
+rumps>=0.4

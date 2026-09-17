@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TG Oxyfire Saver</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="login" id="login" hidden>
+    <div class="login-card login-card-wide">
+      <div class="logo" aria-hidden="true">
+        <img src="/icon.png" width="56" height="56" alt="" style="border-radius:12px" />
+      </div>
+      <h2 data-i18n="login.title">Привязка устройства</h2>
+      <p class="login-hint" id="loginHint" data-i18n="login.hint.qr">В Telegram на телефоне: Настройки → Устройства → «Подключить устройство». Сканируй именно этим сканером — обычная камера / QR в чате не сработают.</p>
+      <div id="qrBlock">
+        <div class="qr-wrap">
+          <img id="qrImg" alt="QR" hidden />
+          <div class="qr-placeholder" id="qrPlaceholder" data-i18n="login.qr_placeholder">Генерируем QR…</div>
+        </div>
+        <button class="btn primary" id="btnRefreshQr" type="button" data-i18n="login.refresh_qr">Обновить QR</button>
+        <button class="btn ghost" id="btnPhoneInstead" type="button" data-i18n="login.phone_instead">Войти по номеру</button>
+      </div>
+      <div id="phoneBlock" hidden>
+        <input id="loginPhone" class="login-input" type="tel" placeholder="+79001234567" />
+        <input id="loginCode" class="login-input" type="text" inputmode="numeric" data-i18n-placeholder="login.code_ph" placeholder="Код из Telegram" hidden />
+        <button class="btn primary" id="loginBtn" type="button" data-i18n="login.get_code">Получить код</button>
+        <button class="btn ghost" id="btnQrInstead" type="button" data-i18n="login.back_qr">Вернуться к QR</button>
+      </div>
+      <input id="loginPassword" class="login-input" type="password" data-i18n-placeholder="login.password_ph" placeholder="Пароль 2FA" hidden />
+      <button class="btn primary" id="btnPassword" type="button" hidden data-i18n="login.confirm_password">Подтвердить пароль</button>
+      <div class="login-error" id="loginError" hidden></div>
+    </div>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo"><svg viewBox="0 0 40 40" width="36" height="36"><circle cx="20" cy="20" r="20" fill="#2AABEE"/><path d="M8.5 19.2l18.3-7.1c.85-.33 1.65.2 1.36 1.5l-3.12 14.7c-.22 1.05-.84 1.3-1.7.8l-4.7-3.46-2.27 2.18c-.25.25-.46.46-.95.46l.34-4.82 8.77-7.92c.38-.34-.08-.5-.59-.18l-10.85 6.83-4.67-1.46c-1.02-.32-1.04-1.02.21-1.52z" fill="#fff"/></svg></div>
+        <div>
+          <div class="brand-title">TG Oxyfire Saver</div>
+          <div class="brand-sub" id="account" data-i18n="account.connecting">Подключение…</div>
+          <div class="brand-ver" id="appVersion">v—</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-btn active" data-tab="queue" type="button" data-i18n="nav.queue">Очередь</button>
+        <button class="nav-btn" data-tab="watchers" type="button" data-i18n="nav.watchers">Сторожа</button>
+        <button class="nav-btn" data-tab="history" type="button" data-i18n="nav.history">История</button>
+        <button class="nav-btn" data-tab="settings" type="button" data-i18n="nav.settings">Настройки</button>
+        <button class="nav-btn" data-tab="about" type="button" data-i18n="nav.about">Как работает</button>
+      </nav>
+      <div class="side-card">
+        <div class="side-label" data-i18n="side.folder">Папка сохранений</div>
+        <div class="side-path" id="outDir">—</div>
+        <div class="side-folder-actions">
+          <button class="btn ghost" id="btnPickFolder" type="button" data-i18n="side.pick">Выбрать…</button>
+          <button class="btn ghost" id="btnOpenFolder" type="button" data-i18n="side.finder">В Finder</button>
+        </div>
+      </div>
+      <div class="side-stats">
+        <div><span id="statQueued">0</span><label data-i18n="side.stat_queue">очередь</label></div>
+        <div><span id="statActive">0</span><label data-i18n="side.stat_active">качается</label></div>
+        <div><span id="statDone">0</span><label data-i18n="side.stat_done">готово</label></div>
+      </div>
+      <label class="switch-row">
+        <span data-i18n="side.clipboard">Режим буфера</span>
+        <input type="checkbox" id="clipToggle" />
+      </label>
+      <button class="btn ghost" id="btnPauseGlobal" type="button" data-i18n="side.pause">Пауза очереди</button>
+      <button class="btn ghost danger" id="btnClear" type="button" data-i18n="side.clear">Очистить завершённые</button>
+    </aside>
+
+    <main class="main">
+      <section class="tab" id="tab-queue">
+        <header class="top">
+          <h1 data-i18n="queue.title">Загрузки</h1>
+          <p class="hint"><span data-i18n="queue.hint">Ссылка, несколько ссылок или диапазон:</span> <code>https://t.me/c/ID/8371-8400</code></p>
+        </header>
+        <section class="composer">
+          <textarea id="urlInput" rows="3" placeholder="https://t.me/c/…/…&#10;https://t.me/c/…/100-150" spellcheck="false"></textarea>
+          <div class="composer-actions">
+            <button class="btn primary" id="btnAdd" type="button" data-i18n="queue.add">Добавить в очередь</button>
+          </div>
+        </section>
+        <section class="queue" id="queue">
+          <div class="empty" id="empty">
+            <div class="empty-icon">↓</div>
+            <div data-i18n="queue.empty">Очередь пуста</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="tab" id="tab-watchers" hidden>
+        <header class="top">
+          <h1 data-i18n="watchers.title">Сторожа каналов</h1>
+          <p class="hint" data-i18n="watchers.hint">Новые посты попадают в очередь, пока приложение в menu bar. Быстрый стоп — тумблер или «Стоп все».</p>
+        </header>
+        <label class="switch-row cardish">
+          <span data-i18n="watchers.master">Сторожа включены (master)</span>
+          <input type="checkbox" id="watchMaster" checked />
+        </label>
+        <div class="composer">
+          <input id="watcherInput" class="login-input" data-i18n-placeholder="watchers.input_ph" placeholder="Ссылка на канал или @username" />
+          <div class="composer-actions">
+            <button class="btn primary" id="btnAddWatcher" type="button" data-i18n="watchers.add">Добавить сторожа</button>
+            <button class="btn ghost danger" id="btnStopWatchers" type="button" data-i18n="watchers.stop_all">Стоп все</button>
+          </div>
+        </div>
+        <div id="watchersList" class="queue"></div>
+      </section>
+
+      <section class="tab" id="tab-history" hidden>
+        <header class="top">
+          <h1 data-i18n="history.title">История</h1>
+          <p class="hint" data-i18n="history.hint">Дедуп по channel + msg id. Можно найти и скачать снова.</p>
+        </header>
+        <div class="composer">
+          <input id="historyQuery" class="login-input" data-i18n-placeholder="history.search_ph" placeholder="Поиск…" />
+        </div>
+        <div id="historyList" class="queue"></div>
+      </section>
+
+      <section class="tab" id="tab-settings" hidden>
+        <header class="top">
+          <h1 data-i18n="settings.title">Настройки</h1>
+        </header>
+        <div class="settings">
+          <label><span data-i18n="settings.language">Язык интерфейса</span>
+            <select id="setLang">
+              <option value="ru" data-i18n="settings.lang_ru">Русский</option>
+              <option value="en" data-i18n="settings.lang_en">English</option>
+            </select>
+          </label>
+          <label><span data-i18n="settings.filter">Фильтр медиа</span>
+            <select id="setFilter">
+              <option value="video" data-i18n="settings.filter_video">Только видео</option>
+              <option value="photo" data-i18n="settings.filter_photo">Только фото</option>
+              <option value="document" data-i18n="settings.filter_document">Документы</option>
+              <option value="all" data-i18n="settings.filter_all">Всё медиа</option>
+            </select>
+          </label>
+          <label><span data-i18n="settings.template">Шаблон имени файла</span>
+            <input id="setTemplate" class="login-input" placeholder="{channel}_{id}_{type}" />
+            <span class="hint" data-i18n="settings.template_hint">Плейсхолдеры: {channel} {id} {date} {caption} {original} {type}</span>
+          </label>
+          <label><span data-i18n="settings.folder">Папка сохранений</span>
+            <div class="folder-row">
+              <input id="setOutDir" class="login-input" readonly />
+              <button class="btn ghost" id="btnPickFolderSettings" type="button" data-i18n="side.pick">Выбрать…</button>
+            </div>
+            <span class="hint" data-i18n="settings.folder_hint">Видео и фото сохраняются сюда, по дням и каналам.</span>
+          </label>
+          <label class="switch-row">
+            <span data-i18n="settings.notify">Уведомления о готовности</span>
+            <input type="checkbox" id="setNotify" />
+          </label>
+          <label><span data-i18n="settings.watch_hours">Часы сторожа (пусто = всегда)</span>
+            <input id="setWatchHours" class="login-input" data-i18n-placeholder="settings.watch_hours_ph" placeholder="9-22 или 22-6" />
+            <span class="hint" data-i18n="settings.watch_hours_hint">Локальное время. Вне интервала новые посты не ставятся в очередь.</span>
+          </label>
+          <button class="btn primary" id="btnSaveSettings" type="button" data-i18n="settings.save">Сохранить</button>
+          <hr class="settings-sep" />
+          <h2 class="settings-h" data-i18n="settings.account">Аккаунт Telegram</h2>
+          <p class="hint" data-i18n="settings.account_hint">Выйти и войти под другим пользователем (QR / номер).</p>
+          <button class="btn ghost danger" id="btnLogout" type="button" data-i18n="settings.logout">Выйти из аккаунта</button>
+          <hr class="settings-sep" />
+          <h2 class="settings-h" data-i18n="settings.about">О программе</h2>
+          <div class="about-block">
+            <p class="about-line"><strong>TG Oxyfire Saver</strong> <span class="about-ver" id="aboutVersion">v—</span></p>
+            <p class="about-line" data-i18n="settings.author">Автор: Ковыршин Кирилл</p>
+            <p class="about-line muted">© 2016 Ковыршин Кирилл</p>
+            <p class="about-links">
+              <a href="https://3dwolf.ru" target="_blank" rel="noopener">3dwolf.ru</a>
+              <a href="https://datastore24.ru" target="_blank" rel="noopener">datastore24.ru</a>
+              <a href="https://myfabric.ru" target="_blank" rel="noopener">myfabric.ru</a>
+            </p>
+            <button class="btn ghost" id="btnAboutPanel" type="button" data-i18n="settings.about_panel">Окно «О программе»…</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab" id="tab-about" hidden>
+        <header class="top">
+          <h1 data-i18n="about.title">Как работает</h1>
+          <p class="hint" data-i18n="about.hint">Локальное приложение для macOS: очередь, menu bar и ваш Telegram-аккаунт.</p>
+        </header>
+        <div class="settings">
+          <h2 class="settings-h" data-i18n="about.how_h">Как это работает</h2>
+          <div class="info-block">
+            <p data-i18n="about.how_1" data-i18n-html>Приложение входит в Telegram <strong>от вашего пользователя</strong> (User API / Telethon) и скачивает медиа по ссылкам, из буфера обмена или через сторожей каналов.</p>
+            <p data-i18n="about.how_2">Очередь и история живут локально. Иконка в menu bar держит загрузки в фоне, даже когда окно закрыто.</p>
+          </div>
+          <h2 class="settings-h" data-i18n="about.privacy_h">Приватность и данные</h2>
+          <div class="info-block">
+            <p data-i18n="about.privacy_1" data-i18n-html><strong>Авторизация Telegram никуда не отправляется</strong> — кроме официальных серверов Telegram, как в обычном клиенте. Мы не собираем сессию, пароли и файлы на свои серверы.</p>
+            <p data-i18n="about.privacy_2">Сессия и настройки хранятся только на этом Mac:</p>
+            <p class="path-mono" id="dataDirHint">~/Library/Application Support/TGVideoSaver/</p>
+            <ul class="info-list">
+              <li><code>tg_saver.session</code> — <span data-i18n="about.file_session">ключ входа в Telegram</span></li>
+              <li><code>data/tg_saver.db</code> — <span data-i18n="about.file_db">очередь, история, настройки</span></li>
+              <li><code>core/thumbs/</code> — <span data-i18n="about.file_thumbs">превью</span></li>
+              <li><code>app.log</code> — <span data-i18n="about.file_log">локальный журнал</span></li>
+            </ul>
+            <p class="hint"><span data-i18n="about.out_hint">Скачанные файлы пишутся в выбранную папку сохранений (сейчас:</span> <span id="outDirHint">—</span>).</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

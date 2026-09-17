@@ -1,0 +1,27 @@
+# Secrets & local runtime
+.env
+*.session
+*.session-journal
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# App runtime (never commit user data)
+src/data/*
+!src/data/.gitkeep
+src/core/thumbs/*
+!src/core/thumbs/.gitkeep
+src/app.log
+src/.api_port
+src/.instance.lock
+src/.menu.lock
+src/store.db
+src/open_err.txt
+
+# Build / release artifacts
+dist/
+*.zip
+*.dmg
+release/
