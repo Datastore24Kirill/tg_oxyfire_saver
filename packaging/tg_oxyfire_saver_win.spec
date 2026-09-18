@@ -6,7 +6,8 @@
 from pathlib import Path
 
 block_cipher = None
-ROOT = Path(SPECPATH).resolve().parent.parent
+# SPECPATH = directory containing this .spec (packaging/)
+ROOT = Path(SPECPATH).resolve().parent
 SRC = ROOT / "src"
 
 datas = [
