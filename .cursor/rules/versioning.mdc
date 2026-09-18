@@ -1,0 +1,39 @@
+---
+description: SemVer for TG Oxyfire Saver releases and version bumps
+alwaysApply: true
+---
+
+# Versioning (SemVer)
+
+Format: `MAJOR.MINOR.PATCH` (e.g. `2.5.1`). Git tag / GitHub release: `vMAJOR.MINOR.PATCH`.
+
+## When to bump
+
+| Change | Bump | Example |
+|--------|------|---------|
+| Bugfix, copy, permissions, packaging-only | **PATCH** | `2.5.0` → `2.5.1` |
+| New user-facing feature / platform / notable UX | **MINOR** (reset PATCH to 0) | `2.5.1` → `2.6.0` |
+| Breaking change for users (reinstall required, incompatible data/API) | **MAJOR** (reset MINOR+PATCH to 0) | `2.6.0` → `3.0.0` |
+
+- Prefer **PATCH** when unsure; do not jump MINOR just because it’s a new release day.
+- Never skip to `x.y+1.0` for a fix-only release.
+- One release = one version bump. Do not reuse a published tag.
+
+## Keep versions in sync
+
+Update **all** of these to the same string before tagging:
+
+- `src/core/service.py` → `APP_VERSION`
+- `src/gui_window.py` → `ApplicationVersion` / `Version`
+- `src/menu_native.swift` → `.applicationVersion` / `.version`
+- `README.md` → Version table cell
+- Bundled app `Info.plist` (`CFBundleShortVersionString` + `CFBundleVersion`) when packaging Mac
+
+UI shows version from the API (`state.version` ← `APP_VERSION`); no hardcode in `gui/app.js`.
+
+## Release checklist
+
+1. Decide bump from the table above (ask user only if MAJOR vs MINOR is ambiguous).
+2. Sync version strings → commit → `git tag -a vX.Y.Z` → push tag.
+3. GitHub Release title: `TG Oxyfire Saver X.Y.Z`; attach Mac zip; Windows zip via Actions on the tag.
+4. Release notes: short Fixes / Features / Download (RU+EN ok).
