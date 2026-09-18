@@ -20,9 +20,28 @@ elif [[ -d "/Applications/$APP_NAME" ]]; then
   APP_SRC="/Applications/$APP_NAME"
 else
   PREV="$(mktemp -d)"
-  echo "Downloading previous Mac zip for the .app skeleton…"
-  curl -fsSL -o "$PREV/prev.zip" \
-    "https://github.com/Datastore24Kirill/tg_oxyfire_saver/releases/latest/download/TG-Oxyfire-Saver-macOS.zip"
+  echo "Downloading a previous Mac zip for the .app skeleton…"
+  export CURRENT="${GITHUB_REF_NAME:-}"
+  ASSET_URL="$(
+    curl -fsSL "https://api.github.com/repos/Datastore24Kirill/tg_oxyfire_saver/releases?per_page=20" \
+      | python3 -c '
+import json, os, sys
+cur = os.environ.get("CURRENT", "")
+rels = json.load(sys.stdin)
+for rel in rels:
+    if rel.get("tag_name") == cur:
+        continue
+    for asset in rel.get("assets") or []:
+        if asset.get("name") == "TG-Oxyfire-Saver-macOS.zip":
+            print(asset["browser_download_url"])
+            raise SystemExit(0)
+raise SystemExit(1)
+' 
+  )" || {
+    echo "ERROR: no previous TG-Oxyfire-Saver-macOS.zip found" >&2
+    exit 1
+  }
+  curl -fsSL -o "$PREV/prev.zip" "$ASSET_URL"
   ditto -x -k "$PREV/prev.zip" "$PREV/unz"
   found="$(find "$PREV/unz" -name "$APP_NAME" -type d | head -1)"
   if [[ -z "$found" ]]; then
