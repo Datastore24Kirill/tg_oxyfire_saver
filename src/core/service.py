@@ -47,7 +47,7 @@ load_dotenv(ROOT / ".env")
 SESSION = ROOT / "tg_saver"
 THUMBS = ROOT / "core" / "thumbs"
 THUMBS.mkdir(parents=True, exist_ok=True)
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.5.0"
 APP_NAME = "TG Oxyfire Saver"
 
 

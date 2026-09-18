@@ -76,8 +76,8 @@ def show_about_panel() -> None:
 
         opts = {
             "ApplicationName": APP,
-            "ApplicationVersion": "2.2.0",
-            "Version": "2.2.0",
+            "ApplicationVersion": "2.5.0",
+            "Version": "2.5.0",
             "Credits": credits,
             "Copyright": COPYRIGHT,
         }
