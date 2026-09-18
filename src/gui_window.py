@@ -36,6 +36,27 @@ LINKS = (
 )
 
 
+def _app_version() -> str:
+    try:
+        from core.version import APP_VERSION
+
+        return APP_VERSION
+    except Exception:
+        pass
+    for path in (SUPPORT / "VERSION", Path(__file__).resolve().parents[1] / "VERSION"):
+        try:
+            if path.is_file():
+                line = path.read_text(encoding="utf-8").strip().splitlines()[0].strip()
+                if line:
+                    return line.lstrip("vV")
+        except OSError:
+            continue
+    return "2.6.0"
+
+
+_APP_VERSION = _app_version()
+
+
 def show_about_panel() -> None:
     """Стандартное macOS-окно «О программе» с автором и ссылками."""
     try:
@@ -76,8 +97,8 @@ def show_about_panel() -> None:
 
         opts = {
             "ApplicationName": APP,
-            "ApplicationVersion": "2.5.0",
-            "Version": "2.5.0",
+            "ApplicationVersion": _APP_VERSION,
+            "Version": _APP_VERSION,
             "Credits": credits,
             "Copyright": COPYRIGHT,
         }

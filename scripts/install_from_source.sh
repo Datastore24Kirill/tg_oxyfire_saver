@@ -26,6 +26,7 @@ rsync -a \
   "$ROOT/src/" "$SUPPORT/"
 
 mkdir -p "$SUPPORT/data" "$SUPPORT/core/thumbs"
+cp "$ROOT/VERSION" "$SUPPORT/VERSION" 2>/dev/null || true
 
 # Always ensure runtime .env exists (bundled defaults; silent for end users)
 if [[ ! -f "$SUPPORT/.env" ]]; then

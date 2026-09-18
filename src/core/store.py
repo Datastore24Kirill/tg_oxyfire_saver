@@ -22,6 +22,16 @@ DEFAULT_SETTINGS = {
     # Расписание сторожа: пусто = всегда; иначе "9-22" (локальные часы)
     "watch_hours": "",
     "ui_lang": "ru",  # ru|en
+    "ui_theme": "dark",  # dark|light
+    "onboarding_done": False,
+    "download_concurrency": 2,  # 1..5
+    "proxy_enabled": False,
+    "proxy_type": "socks5",  # socks5|http|mtproto
+    "proxy_host": "",
+    "proxy_port": 0,
+    "proxy_username": "",
+    "proxy_password": "",
+    "proxy_secret": "",
 }
 
 

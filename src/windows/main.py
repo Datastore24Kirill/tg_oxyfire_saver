@@ -17,10 +17,10 @@ if str(_SRC) not in sys.path:
 
 def _log(msg: str) -> None:
     try:
+        from core.logutil import append_log
         from core.runtime import support_dir
 
-        with open(support_dir() / "app.log", "a", encoding="utf-8") as f:
-            f.write(msg + "\n")
+        append_log(support_dir() / "app.log", msg)
     except OSError:
         pass
 

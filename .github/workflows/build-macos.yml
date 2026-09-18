@@ -1,0 +1,33 @@
+name: Build macOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package Mac zip
+        run: bash scripts/package_macos.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TG-Oxyfire-Saver-macOS
+          path: dist/TG-Oxyfire-Saver-macOS.zip
+
+      - name: Attach to GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/TG-Oxyfire-Saver-macOS.zip
+          fail_on_unmatched_files: true

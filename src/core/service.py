@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import json
 import os
 import re
+import shutil
 import threading
 import time
+import urllib.request
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -26,6 +29,7 @@ from telethon.errors import (
 from telethon.tl.custom.qrlogin import QRLogin
 
 from core.links import ParsedTarget, parse_targets
+from core.logutil import append_log
 from core.naming import (
     build_filename,
     detect_media_type,
@@ -33,6 +37,7 @@ from core.naming import (
     original_name,
 )
 from core.notify import mark_finder_label, notify, open_path, reveal_path
+from core.proxy_cfg import telethon_proxy_kwargs
 from core.paths import (
     DEFAULT_OUT,
     channel_out_dir,
@@ -41,14 +46,46 @@ from core.paths import (
     safe_folder_name,
 )
 from core.store import Store
+from core.version import APP_VERSION, is_newer
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 SESSION = ROOT / "tg_saver"
 THUMBS = ROOT / "core" / "thumbs"
 THUMBS.mkdir(parents=True, exist_ok=True)
-APP_VERSION = "2.5.0"
 APP_NAME = "TG Oxyfire Saver"
+GITHUB_LATEST = (
+    "https://api.github.com/repos/Datastore24Kirill/tg_oxyfire_saver/releases/latest"
+)
+_SETTINGS_KEYS = {
+    "media_filter",
+    "filename_template",
+    "clipboard_mode",
+    "watchers_master",
+    "out_dir",
+    "notify_on_done",
+    "watch_hours",
+    "ui_lang",
+    "ui_theme",
+    "onboarding_done",
+    "download_concurrency",
+    "proxy_enabled",
+    "proxy_type",
+    "proxy_host",
+    "proxy_port",
+    "proxy_username",
+    "proxy_password",
+    "proxy_secret",
+}
+_PROXY_KEYS = {
+    "proxy_enabled",
+    "proxy_type",
+    "proxy_host",
+    "proxy_port",
+    "proxy_username",
+    "proxy_password",
+    "proxy_secret",
+}
 
 
 def qr_data_url(url: str) -> str:
@@ -180,6 +217,11 @@ class DownloadService:
         self._watch_handlers: list[Any] = []
         self._status_listeners: list[Any] = []
         self.clipboard = None  # set from outside
+        self._tg_connected = False
+        self._tg_status = "offline"
+        self._proxy_error: str | None = None
+        self._slot_cv: asyncio.Condition | None = None
+        self._active_downloads = 0
         self._restore_active_queue()
         self._restore_jobs_from_history()
 
@@ -397,15 +439,17 @@ class DownloadService:
             self._bootstrapped.set()
 
     def _log(self, msg: str) -> None:
-        line = f"{time.strftime('%H:%M:%S')} {msg}\n"
-        try:
-            with open(self._log_path, "a", encoding="utf-8") as f:
-                f.write(line)
-        except OSError:
-            pass
+        line = f"{time.strftime('%H:%M:%S')} {msg}"
+        append_log(self._log_path, line)
 
-    async def _bootstrap(self) -> None:
-        # Default: public Telegram Desktop OSS credentials (no my.telegram.org needed).
+    def _concurrency(self) -> int:
+        try:
+            n = int(self.store.get_setting("download_concurrency", 2) or 2)
+        except (TypeError, ValueError):
+            n = 2
+        return max(1, min(5, n))
+
+    def _api_credentials(self) -> tuple[int, str]:
         api_id = os.getenv("API_ID", "2040").strip() or "2040"
         api_hash = (
             os.getenv("API_HASH", "b18441a1ff607e10a989891a5462e627").strip()
@@ -413,16 +457,39 @@ class DownloadService:
         )
         if not api_id.isdigit() or not api_hash:
             raise RuntimeError("Нет API_ID/API_HASH в .env")
-        self._client = TelegramClient(
+        return int(api_id), api_hash
+
+    def _make_client(self) -> TelegramClient:
+        api_id, api_hash = self._api_credentials()
+        kwargs = telethon_proxy_kwargs(self.store.all_settings())
+        return TelegramClient(
             str(SESSION),
-            int(api_id),
+            api_id,
             api_hash,
             device_model="TG Oxyfire Saver",
             system_version="macOS",
             app_version=APP_VERSION,
             lang_code="ru",
             system_lang_code="ru-RU",
+            **kwargs,
         )
+
+    def _require_disk_space(self, dest: Path, needed_bytes: int) -> None:
+        reserve = 100 * 1024 * 1024
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+            free = shutil.disk_usage(dest).free
+        except OSError as e:
+            raise RuntimeError(f"Не удалось проверить диск: {e}") from e
+        need = max(0, int(needed_bytes)) + reserve
+        if free < need:
+            raise RuntimeError(
+                f"Не хватает места на диске: свободно {free / 1e6:.0f} МБ, "
+                f"нужно около {need / 1e6:.0f} МБ"
+            )
+
+    async def _bootstrap(self) -> None:
+        self._client = self._make_client()
         await self._client.connect()
         self._pause_event = asyncio.Event()
         self._pause_event.set()
@@ -438,9 +505,15 @@ class DownloadService:
         self._account = f"{me.first_name} (@{me.username or '—'})"
         self._auth_state = "ready"
         self._qr_png = None
+        self._tg_connected = True
+        self._tg_status = "online"
+        self._proxy_error = None
         if not self._worker_started:
             self._q = asyncio.Queue()
-            asyncio.create_task(self._worker())
+            self._slot_cv = asyncio.Condition()
+            self._active_downloads = 0
+            for _ in range(5):
+                asyncio.create_task(self._worker())
             self._worker_started = True
         # Продолжить сохранённую очередь
         with self._lock:
@@ -461,15 +534,24 @@ class DownloadService:
             try:
                 await asyncio.sleep(120)
                 if self._auth_state != "ready" or not self._client:
+                    self._tg_connected = False
+                    if self._auth_state == "connecting":
+                        self._tg_status = "reconnecting"
                     continue
                 if not self._client.is_connected():
+                    self._tg_status = "reconnecting"
+                    self._tg_connected = False
                     await self._ensure_connected()
                 else:
-                    # лёгкий ping
                     await self._client.get_me()
+                self._tg_connected = True
+                self._tg_status = "online"
+                self._proxy_error = None
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001
+                self._tg_connected = False
+                self._tg_status = "offline"
                 self._log(f"keepalive: {e}")
 
     # ----- auth (QR / phone) -----
@@ -691,6 +773,9 @@ class DownloadService:
             "watchers": watchers,
             "clipboard_mode": bool(settings.get("clipboard_mode")),
             "watchers_master": bool(settings.get("watchers_master", True)),
+            "tg_connected": self._tg_connected,
+            "tg_status": self._tg_status,
+            "proxy_error": self._proxy_error,
             "stats": {
                 "queued": sum(1 for j in jobs if j["status"] == "queued"),
                 "active": active,
@@ -700,26 +785,130 @@ class DownloadService:
         }
 
     def update_settings(self, patch: dict[str, Any]) -> dict[str, Any]:
+        proxy_changed = False
         for k, v in (patch or {}).items():
-            if k in (
-                "media_filter",
-                "filename_template",
-                "clipboard_mode",
-                "watchers_master",
-                "out_dir",
-                "notify_on_done",
-                "watch_hours",
-                "ui_lang",
-            ):
-                if k == "ui_lang":
-                    v = "en" if str(v).lower().startswith("en") else "ru"
-                self.store.set_setting(k, v)
-                if k == "out_dir":
-                    self.out_dir = Path(str(v))
-                    self.out_dir.mkdir(parents=True, exist_ok=True)
-                if k == "watchers_master" and self._loop and self._auth_state == "ready":
-                    asyncio.run_coroutine_threadsafe(self._setup_watchers(), self._loop)
+            if k not in _SETTINGS_KEYS:
+                continue
+            if k == "ui_lang":
+                v = "en" if str(v).lower().startswith("en") else "ru"
+            if k == "ui_theme":
+                v = "light" if str(v).lower() == "light" else "dark"
+            if k == "download_concurrency":
+                try:
+                    v = max(1, min(5, int(v)))
+                except (TypeError, ValueError):
+                    v = 2
+            if k == "proxy_type":
+                v = str(v).lower()
+                if v not in ("socks5", "http", "mtproto"):
+                    v = "socks5"
+            if k == "proxy_port":
+                try:
+                    v = int(v or 0)
+                except (TypeError, ValueError):
+                    v = 0
+            if k in ("proxy_enabled", "onboarding_done", "clipboard_mode", "watchers_master", "notify_on_done"):
+                v = bool(v)
+            self.store.set_setting(k, v)
+            if k in _PROXY_KEYS:
+                proxy_changed = True
+            if k == "out_dir":
+                self.out_dir = Path(str(v))
+                self.out_dir.mkdir(parents=True, exist_ok=True)
+            if k == "watchers_master" and self._loop and self._auth_state == "ready":
+                asyncio.run_coroutine_threadsafe(self._setup_watchers(), self._loop)
+            if k == "download_concurrency" and self._slot_cv and self._loop:
+                def _wake() -> None:
+                    async def _notify() -> None:
+                        assert self._slot_cv
+                        async with self._slot_cv:
+                            self._slot_cv.notify_all()
+
+                    asyncio.create_task(_notify())
+
+                self._loop.call_soon_threadsafe(_wake)
+        if proxy_changed and self._loop and self._client:
+            asyncio.run_coroutine_threadsafe(self._reconnect_proxy(), self._loop)
         return {"ok": True, "settings": self.store.all_settings()}
+
+    def export_bundle(self) -> dict[str, Any]:
+        return {
+            "app": APP_NAME,
+            "version": 1,
+            "settings": self.store.all_settings(),
+            "watchers": self.store.list_watchers(),
+        }
+
+    def import_bundle(self, data: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(data, dict):
+            return {"ok": False, "error": "Неверный файл"}
+        settings = data.get("settings") or {}
+        if isinstance(settings, dict):
+            self.update_settings(settings)
+        for w in data.get("watchers") or []:
+            if not isinstance(w, dict) or not w.get("peer_key"):
+                continue
+            self.store.upsert_watcher(
+                str(w["peer_key"]),
+                str(w.get("title") or w["peer_key"]),
+                enabled=bool(w.get("enabled", True)),
+                media_filter=w.get("media_filter") or "video",
+                last_msg_id=int(w.get("last_msg_id") or 0),
+            )
+        if self._loop and self._auth_state == "ready":
+            asyncio.run_coroutine_threadsafe(self._setup_watchers(), self._loop)
+        return {"ok": True, "settings": self.store.all_settings()}
+
+    def check_update(self) -> dict[str, Any]:
+        try:
+            req = urllib.request.Request(
+                GITHUB_LATEST,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "User-Agent": "TGOxyfireSaver",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            tag = str(payload.get("tag_name") or "").lstrip("vV")
+            url = str(payload.get("html_url") or "")
+            return {
+                "ok": True,
+                "current": APP_VERSION,
+                "latest": tag,
+                "url": url,
+                "newer": bool(tag) and is_newer(tag, APP_VERSION),
+            }
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "current": APP_VERSION, "error": str(e), "newer": False}
+
+    async def _reconnect_proxy(self) -> None:
+        self._tg_status = "reconnecting"
+        self._tg_connected = False
+        self._proxy_error = None
+        try:
+            if self._client:
+                try:
+                    await self._client.disconnect()
+                except Exception:
+                    pass
+            self._client = self._make_client()
+            await self._client.connect()
+            if await self._client.is_user_authorized():
+                me = await self._client.get_me()
+                self._account = f"{me.first_name} (@{me.username or '—'})"
+                self._auth_state = "ready"
+                self._tg_connected = True
+                self._tg_status = "online"
+                await self._setup_watchers()
+            else:
+                self._tg_status = "offline"
+                await self._start_qr_login()
+        except Exception as e:  # noqa: BLE001
+            self._proxy_error = str(e)
+            self._tg_connected = False
+            self._tg_status = "offline"
+            self._log(f"proxy reconnect: {e}")
 
     # ----- queue controls -----
     def set_paused(self, paused: bool) -> dict[str, Any]:
@@ -890,6 +1079,20 @@ class DownloadService:
         assert self._q is not None
         await self._q.put(job_id)
 
+    async def _acquire_slot(self) -> None:
+        assert self._slot_cv is not None
+        async with self._slot_cv:
+            while self._active_downloads >= self._concurrency():
+                await self._slot_cv.wait()
+            self._active_downloads += 1
+
+    async def _release_slot(self) -> None:
+        if self._slot_cv is None:
+            return
+        async with self._slot_cv:
+            self._active_downloads = max(0, self._active_downloads - 1)
+            self._slot_cv.notify_all()
+
     async def _worker(self) -> None:
         assert self._q is not None
         while True:
@@ -901,7 +1104,11 @@ class DownloadService:
                     job = self._jobs.get(job_id)
                 if not job or job.status in ("cancelled", "paused", "skipped", "done"):
                     continue
-                await self._process(job_id)
+                await self._acquire_slot()
+                try:
+                    await self._process(job_id)
+                finally:
+                    await self._release_slot()
             finally:
                 self._q.task_done()
 
@@ -909,12 +1116,18 @@ class DownloadService:
         """После sleep/сети Telethon часто disconnected, а UI всё ещё ready."""
         assert self._client is not None
         if not self._client.is_connected():
+            self._tg_status = "reconnecting"
+            self._tg_connected = False
             self._log("telegram reconnect…")
             await self._client.connect()
         if not await self._client.is_user_authorized():
             self._auth_state = "qr"
             self._account = None
+            self._tg_connected = False
+            self._tg_status = "offline"
             raise RuntimeError("Сессия Telegram истекла — войди заново")
+        self._tg_connected = True
+        self._tg_status = "online"
 
     async def _process(self, job_id: str) -> None:
         assert self._client
@@ -989,6 +1202,12 @@ class DownloadService:
                 rollover_day_folders(self.out_dir)
                 dest_dir = channel_out_dir(self.out_dir, job.channel)
                 orig = original_name(m)
+                needed = 0
+                try:
+                    needed = int(getattr(getattr(m, "file", None), "size", 0) or 0)
+                except (TypeError, ValueError):
+                    needed = 0
+                self._require_disk_space(dest_dir, needed)
                 # временное имя — Telethon сам поставит расширение
                 stem = build_filename(
                     template=template,
@@ -1116,7 +1335,8 @@ class DownloadService:
                     error=msg,
                 )
         finally:
-            self._active_job_id = None
+            if self._active_job_id == job_id:
+                self._active_job_id = None
             self._persist_job(job)
 
     async def _maybe_thumb(self, job: Job, msg: Any) -> None:
@@ -1223,22 +1443,7 @@ class DownloadService:
                 self._auth_state = "qr"
                 self._qr_png = None
                 self._qr_url = None
-                self._worker_started = False
-                api_id = os.getenv("API_ID", "2040").strip() or "2040"
-                api_hash = (
-                    os.getenv("API_HASH", "b18441a1ff607e10a989891a5462e627").strip()
-                    or "b18441a1ff607e10a989891a5462e627"
-                )
-                self._client = TelegramClient(
-                    str(SESSION),
-                    int(api_id),
-                    api_hash,
-                    device_model="TG Oxyfire Saver",
-                    system_version="macOS",
-                    app_version=APP_VERSION,
-                    lang_code="ru",
-                    system_lang_code="ru-RU",
-                )
+                self._client = self._make_client()
                 await self._client.connect()
                 await self._start_qr_login()
                 return {"ok": True}

@@ -41,11 +41,9 @@ except Exception:
 
 
 def _log(msg: str) -> None:
-    try:
-        with open(LOG, "a", encoding="utf-8") as f:
-            f.write(msg + "\n")
-    except OSError:
-        pass
+    from core.logutil import append_log
+
+    append_log(LOG, msg)
 
 
 class MenuTarget(NSObject):

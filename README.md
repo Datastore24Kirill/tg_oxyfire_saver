@@ -18,7 +18,7 @@ Download Telegram media (video / photo / documents) with a queue, history, chann
 
 | | |
 |---|---|
-| Version | **2.5.0** |
+| Version | **2.6.0** |
 | Platforms | **macOS 12+** · **Windows 10/11** |
 | Author | Kirill Kovyirshin (Ковыршин Кирилл) © 2016 |
 | Links | [3dwolf.ru](https://3dwolf.ru) · [datastore24.ru](https://datastore24.ru) · [myfabric.ru](https://myfabric.ru) |
@@ -54,6 +54,8 @@ Telegram auth is only sent to **official Telegram servers**, like a normal clien
 4. Sign in with QR (Telegram → Settings → Devices)
 5. Needs **WebView2** (usually already on Windows 10/11). If the window is blank, install [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
 6. SmartScreen: **More info** → **Run anyway**
+
+The app is not code-signed yet (Apple notarization and a Windows certificate come later). Gatekeeper and SmartScreen warnings are expected.
 
 ### Build from source
 ```bash
@@ -93,6 +95,7 @@ pyinstaller packaging/tg_oxyfire_saver_win.spec
 3. Войти по QR
 4. Нужен **WebView2** (обычно уже есть). Пустое окно → [установить Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
 5. SmartScreen: **Подробнее** → **Выполнить в любом случае**
+6. Приложение пока без подписи (нотаризация Apple и сертификат Windows — позже). Предупреждения Gatekeeper и SmartScreen ожидаемы.
 
 ### Сборка из исходников
 ```bash

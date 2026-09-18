@@ -47,6 +47,43 @@ let lastSettingsKey = "";
 let lastPauseLabel = "";
 let lastClip = null;
 let lastWatchMaster = null;
+let lastTg = "";
+let wizardOpen = false;
+let updateUrl = "";
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
+}
+
+function settingsPayload() {
+  return {
+    media_filter: $("#setFilter").value,
+    filename_template: $("#setTemplate").value,
+    out_dir: $("#setOutDir").value,
+    notify_on_done: $("#setNotify").checked,
+    watch_hours: $("#setWatchHours").value.trim(),
+    ui_lang: $("#setLang")?.value === "en" ? "en" : "ru",
+    ui_theme: $("#setTheme")?.value === "light" ? "light" : "dark",
+    download_concurrency: Number($("#setConcurrency")?.value || 2),
+    proxy_enabled: !!$("#setProxyOn")?.checked,
+    proxy_type: $("#setProxyType")?.value || "socks5",
+    proxy_host: $("#setProxyHost")?.value.trim() || "",
+    proxy_port: Number($("#setProxyPort")?.value || 0),
+    proxy_username: $("#setProxyUser")?.value || "",
+    proxy_password: $("#setProxyPass")?.value || "",
+    proxy_secret: $("#setProxySecret")?.value || "",
+  };
+}
+
+async function openExternal(url) {
+  try {
+    if (window.pywebview?.api?.open_url) {
+      await window.pywebview.api.open_url(url);
+      return;
+    }
+  } catch (_) {}
+  window.open(url, "_blank");
+}
 
 function toast(msg) {
   toastEl.hidden = false;
@@ -417,11 +454,21 @@ async function loadHistory() {
 function fillSettings(s) {
   if (!s) return;
   applyLangFromSettings(s);
+  applyTheme(s.ui_theme);
   $("#setFilter").value = s.media_filter || "video";
   $("#setTemplate").value = s.filename_template || "{channel}_{id}_{type}";
   $("#setOutDir").value = s.out_dir || "";
   $("#setNotify").checked = !!s.notify_on_done;
   $("#setWatchHours").value = s.watch_hours || "";
+  if ($("#setTheme")) $("#setTheme").value = s.ui_theme === "light" ? "light" : "dark";
+  if ($("#setConcurrency")) $("#setConcurrency").value = String(s.download_concurrency || 2);
+  if ($("#setProxyOn")) $("#setProxyOn").checked = !!s.proxy_enabled;
+  if ($("#setProxyType")) $("#setProxyType").value = s.proxy_type || "socks5";
+  if ($("#setProxyHost")) $("#setProxyHost").value = s.proxy_host || "";
+  if ($("#setProxyPort")) $("#setProxyPort").value = s.proxy_port ? String(s.proxy_port) : "";
+  if ($("#setProxyUser")) $("#setProxyUser").value = s.proxy_username || "";
+  if ($("#setProxyPass")) $("#setProxyPass").value = s.proxy_password || "";
+  if ($("#setProxySecret")) $("#setProxySecret").value = s.proxy_secret || "";
   clipToggle.checked = !!s.clipboard_mode;
 }
 
@@ -457,6 +504,26 @@ async function tick() {
     showLogin(state);
     if (appVersionEl && state.version) appVersionEl.textContent = `v${state.version}`;
     if (aboutVersionEl && state.version) aboutVersionEl.textContent = `v${state.version}`;
+    const tgEl = $("#tgStatus");
+    if (tgEl) {
+      const st = state.tg_status || "offline";
+      const label = t(st === "online" ? "tg.online" : st === "reconnecting" ? "tg.reconnecting" : "tg.offline");
+      const key = st + label;
+      if (key !== lastTg) {
+        lastTg = key;
+        tgEl.textContent = label;
+        tgEl.className = `tg-status ${st}`;
+      }
+    }
+    const perr = $("#proxyError");
+    if (perr) {
+      if (state.proxy_error) {
+        perr.hidden = false;
+        perr.textContent = state.proxy_error;
+      } else {
+        perr.hidden = true;
+      }
+    }
     if (state.ready) {
       accountEl.textContent = state.account || "OK";
       outDirEl.textContent = state.out_dir || "—";
@@ -494,6 +561,15 @@ async function tick() {
       if (wm !== lastWatchMaster && document.activeElement !== watchMaster) {
         lastWatchMaster = wm;
         watchMaster.checked = wm;
+      }
+      const wiz = $("#wizard");
+      if (wiz && state.settings && !state.settings.onboarding_done && !wizardOpen) {
+        wizardOpen = true;
+        $("#wizLang").value = state.settings.ui_lang === "en" ? "en" : "ru";
+        $("#wizTheme").value = state.settings.ui_theme === "light" ? "light" : "dark";
+        $("#wizFolder").value = state.out_dir || state.settings.out_dir || "";
+        wiz.hidden = false;
+        window.I18N?.apply();
       }
     }
   } catch (e) {
@@ -571,17 +647,65 @@ function bind() {
     tick();
   });
   $("#btnSaveSettings").addEventListener("click", async () => {
-    await api("/settings", {
-      method: "POST",
-      body: {
-        media_filter: $("#setFilter").value,
-        filename_template: $("#setTemplate").value,
-        out_dir: $("#setOutDir").value,
-        notify_on_done: $("#setNotify").checked,
-        watch_hours: $("#setWatchHours").value.trim(),
-        ui_lang: $("#setLang")?.value === "en" ? "en" : "ru",
-      },
-    });
+    await api("/settings", { method: "POST", body: settingsPayload() });
+    applyTheme($("#setTheme")?.value);
+    toast(t("toast.saved"));
+  });
+  $("#setTheme")?.addEventListener("change", () => applyTheme($("#setTheme").value));
+  $("#btnExport")?.addEventListener("click", async () => {
+    const data = await api("/settings/export");
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "tg-oxyfire-saver-settings.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  $("#btnImport")?.addEventListener("click", () => $("#importFile")?.click());
+  $("#importFile")?.addEventListener("change", async () => {
+    const file = $("#importFile").files?.[0];
+    $("#importFile").value = "";
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      const res = await api("/settings/import", { method: "POST", body: data });
+      if (!res.ok) return toast(res.error || t("toast.import_fail"));
+      lastSettingsKey = "";
+      toast(t("toast.imported"));
+      tick();
+    } catch (_) {
+      toast(t("toast.import_fail"));
+    }
+  });
+  $("#btnUpdate")?.addEventListener("click", () => {
+    if (updateUrl) openExternal(updateUrl);
+  });
+  $("#btnWizFolder")?.addEventListener("click", async () => {
+    let path = null;
+    try {
+      if (window.pywebview?.api?.pick_folder) path = await window.pywebview.api.pick_folder();
+    } catch (_) {}
+    if (path) $("#wizFolder").value = path;
+  });
+  $("#wizLang")?.addEventListener("change", () => {
+    window.I18N.setLang($("#wizLang").value === "en" ? "en" : "ru");
+  });
+  $("#wizTheme")?.addEventListener("change", () => applyTheme($("#wizTheme").value));
+  $("#btnWizDone")?.addEventListener("click", async () => {
+    const lang = $("#wizLang").value === "en" ? "en" : "ru";
+    const theme = $("#wizTheme").value === "light" ? "light" : "dark";
+    window.I18N.setLang(lang);
+    applyTheme(theme);
+    const body = {
+      ui_lang: lang,
+      ui_theme: theme,
+      onboarding_done: true,
+    };
+    const folder = $("#wizFolder").value.trim();
+    if (folder) body.out_dir = folder;
+    await api("/settings", { method: "POST", body });
+    $("#wizard").hidden = true;
+    lastSettingsKey = "";
     toast(t("toast.saved"));
   });
   $("#btnLogout").addEventListener("click", async () => {
@@ -626,6 +750,23 @@ function bind() {
   btnPassword.addEventListener("click", onPassword);
   setInterval(tick, 500);
   tick();
+  checkUpdate();
+  setInterval(checkUpdate, 6 * 60 * 60 * 1000);
+}
+
+async function checkUpdate() {
+  try {
+    const info = await api("/update");
+    const banner = $("#updateBanner");
+    if (!banner) return;
+    if (info?.newer && info.url) {
+      updateUrl = info.url;
+      $("#updateText").textContent = `${t("update.available")}: v${info.latest}`;
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+  } catch (_) {}
 }
 
 window.I18N?.apply();

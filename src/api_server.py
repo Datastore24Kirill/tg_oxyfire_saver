@@ -147,6 +147,19 @@ def create_app(service) -> Flask:
         service.reveal(data.get("path", ""))
         return jsonify({"ok": True})
 
+    @app.get("/api/settings/export")
+    def settings_export():
+        return jsonify(service.export_bundle())
+
+    @app.post("/api/settings/import")
+    def settings_import():
+        data = request.get_json(force=True, silent=True) or {}
+        return jsonify(service.import_bundle(data))
+
+    @app.get("/api/update")
+    def update_check():
+        return jsonify(service.check_update())
+
     @app.get("/api/health")
     def health():
         return jsonify({"ok": True})

@@ -21,19 +21,19 @@ Format: `MAJOR.MINOR.PATCH` (e.g. `2.5.1`). Git tag / GitHub release: `vMAJOR.MI
 
 ## Keep versions in sync
 
-Update **all** of these to the same string before tagging:
+Single source: repo root `VERSION` (read by `src/core/version.py` → `APP_VERSION`).
 
-- `src/core/service.py` → `APP_VERSION`
-- `src/gui_window.py` → `ApplicationVersion` / `Version`
-- `src/menu_native.swift` → `.applicationVersion` / `.version`
+Before tagging, set `VERSION` and sync the copies that cannot import Python:
+
 - `README.md` → Version table cell
-- Bundled app `Info.plist` (`CFBundleShortVersionString` + `CFBundleVersion`) when packaging Mac
+- `src/menu_native.swift` → `.applicationVersion` / `.version` (or let `scripts/package_macos.sh` rewrite them)
+- Bundled app `Info.plist` (`CFBundleShortVersionString` + `CFBundleVersion`) — packaging script
 
-UI shows version from the API (`state.version` ← `APP_VERSION`); no hardcode in `gui/app.js`.
+`src/gui_window.py` reads `APP_VERSION`. UI shows version from the API (`state.version`); no hardcode in `gui/app.js`.
 
 ## Release checklist
 
 1. Decide bump from the table above (ask user only if MAJOR vs MINOR is ambiguous).
-2. Sync version strings → commit → `git tag -a vX.Y.Z` → push tag.
-3. GitHub Release title: `TG Oxyfire Saver X.Y.Z`; attach Mac zip; Windows zip via Actions on the tag.
-4. Release notes: short Fixes / Features / Download (RU+EN ok).
+2. Write the new string to `VERSION` and sync the copies above → commit → `git tag -a vX.Y.Z` → push tag.
+3. GitHub Release title: `TG Oxyfire Saver X.Y.Z`. Notes sections: **Features** and/or **Fixes** (match the bump), then **Download** (Mac zip + Windows zip). RU+EN ok.
+4. Tag push runs Mac and Windows workflows; both zips attach to the release. Do not attach Source code only.
