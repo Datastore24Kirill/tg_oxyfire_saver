@@ -9,14 +9,15 @@ import time
 from pathlib import Path
 from typing import Any
 
-from core.runtime import support_dir
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT / "data" / "tg_saver.db"
 
 DEFAULT_SETTINGS = {
     "media_filter": "video",  # video|photo|document|all
     "filename_template": "{channel}_{id}_{type}",
     "clipboard_mode": False,
     "watchers_master": True,
-    "out_dir": str(Path.home() / "Desktop" / "TelegramCaptures"),
+    "out_dir": str(Path.home() / "Downloads" / "TelegramCaptures"),
     "notify_on_done": True,
     # Расписание сторожа: пусто = всегда; иначе "9-22" (локальные часы)
     "watch_hours": "",
@@ -24,16 +25,12 @@ DEFAULT_SETTINGS = {
 }
 
 
-def default_db_path() -> Path:
-    return support_dir() / "data" / "tg_saver.db"
-
-
 class Store:
-    def __init__(self, path: Path | None = None) -> None:
-        self.path = path or default_db_path()
+    def __init__(self, path: Path = DB_PATH) -> None:
+        self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        self._conn = sqlite3.connect(str(self.path), check_same_thread=False)
+        self._conn = sqlite3.connect(str(path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._init()
 

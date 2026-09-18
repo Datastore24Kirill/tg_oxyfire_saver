@@ -33,18 +33,21 @@ from core.naming import (
     original_name,
 )
 from core.notify import mark_finder_label, notify, open_path, reveal_path
-from core.paths import DEFAULT_OUT, channel_out_dir, rollover_day_folders, safe_folder_name
-from core.runtime import ensure_support_layout, system_name
+from core.paths import (
+    DEFAULT_OUT,
+    channel_out_dir,
+    ensure_writable_out_dir,
+    rollover_day_folders,
+    safe_folder_name,
+)
 from core.store import Store
 
-# support_dir unused import removed — ensure_support_layout is enough
-ROOT = ensure_support_layout()
-os.chdir(ROOT)
+ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 SESSION = ROOT / "tg_saver"
 THUMBS = ROOT / "core" / "thumbs"
 THUMBS.mkdir(parents=True, exist_ok=True)
-APP_VERSION = "2.4.0"
+APP_VERSION = "2.3.0"
 APP_NAME = "TG Oxyfire Saver"
 
 
@@ -183,9 +186,44 @@ class DownloadService:
     def _ensure_out_dir(self) -> None:
         try:
             self.out_dir.mkdir(parents=True, exist_ok=True)
+            # probe write (Desktop TCC often allows mkdir but blocks files)
+            probe = self.out_dir / ".write_probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
             rollover_day_folders(self.out_dir)
-        except Exception:
-            pass
+        except PermissionError:
+            fallback = Path.home() / "Downloads" / "TelegramCaptures"
+            try:
+                fallback.mkdir(parents=True, exist_ok=True)
+                self.out_dir = fallback
+                self.store.set_setting("out_dir", str(fallback))
+                self._log(
+                    f"out_dir Desktop blocked → fallback {fallback}"
+                )
+                rollover_day_folders(self.out_dir)
+            except Exception as e:
+                self._log(f"out_dir fallback fail: {e}")
+        except Exception as e:
+            self._log(f"out_dir ensure fail: {e}")
+
+    def _ensure_writable_out_dir(self) -> Path:
+        """Before download: if current out_dir is blocked, switch to Downloads."""
+        try:
+            self.out_dir.mkdir(parents=True, exist_ok=True)
+            probe = self.out_dir / ".write_probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
+            return self.out_dir
+        except PermissionError:
+            fallback = Path.home() / "Downloads" / "TelegramCaptures"
+            fallback.mkdir(parents=True, exist_ok=True)
+            self.out_dir = fallback
+            try:
+                self.store.set_setting("out_dir", str(fallback))
+            except Exception:
+                pass
+            self._log(f"download: out_dir blocked → {fallback}")
+            return self.out_dir
 
     def _persist_job(self, job: Job) -> None:
         """Активные + ошибки живут в queue; done/skipped — только history."""
@@ -380,7 +418,7 @@ class DownloadService:
             int(api_id),
             api_hash,
             device_model="TG Oxyfire Saver",
-            system_version=system_name(),
+            system_version="macOS",
             app_version=APP_VERSION,
             lang_code="ru",
             system_lang_code="ru-RU",
@@ -947,6 +985,7 @@ class DownloadService:
 
                 await self._maybe_thumb(job, m)
 
+                self._ensure_writable_out_dir()
                 rollover_day_folders(self.out_dir)
                 dest_dir = channel_out_dir(self.out_dir, job.channel)
                 orig = original_name(m)
@@ -1185,14 +1224,17 @@ class DownloadService:
                 self._qr_png = None
                 self._qr_url = None
                 self._worker_started = False
-                api_id = os.getenv("API_ID", "").strip()
-                api_hash = os.getenv("API_HASH", "").strip()
+                api_id = os.getenv("API_ID", "2040").strip() or "2040"
+                api_hash = (
+                    os.getenv("API_HASH", "b18441a1ff607e10a989891a5462e627").strip()
+                    or "b18441a1ff607e10a989891a5462e627"
+                )
                 self._client = TelegramClient(
                     str(SESSION),
                     int(api_id),
                     api_hash,
                     device_model="TG Oxyfire Saver",
-                    system_version=system_name(),
+                    system_version="macOS",
                     app_version=APP_VERSION,
                     lang_code="ru",
                     system_lang_code="ru-RU",

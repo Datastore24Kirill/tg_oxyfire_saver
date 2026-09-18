@@ -10,7 +10,49 @@ from pathlib import Path
 FOLDER_TODAY = "Сегодня"
 FOLDER_YESTERDAY = "Вчера"
 
-DEFAULT_OUT = Path.home() / "Desktop" / "TelegramCaptures"
+DEFAULT_OUT = Path.home() / "Downloads" / "TelegramCaptures"
+
+
+def probe_writable(folder: Path) -> bool:
+    """True, если можно создать папку и записать тестовый файл."""
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".tg_oxyfire_write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+
+def ensure_writable_out_dir(preferred: Path | str | None = None) -> Path:
+    """Вернуть доступную папку сохранений.
+
+    Desktop на новых macOS часто закрыт для helper-процессов (TCC).
+    Fallback: ~/Downloads/TelegramCaptures.
+    """
+    candidates: list[Path] = []
+    if preferred:
+        candidates.append(Path(preferred).expanduser())
+    candidates.append(DEFAULT_OUT)
+    # unique preserve order
+    seen: set[str] = set()
+    for c in candidates:
+        key = str(c)
+        if key in seen:
+            continue
+        seen.add(key)
+        if probe_writable(c):
+            return c
+    # last resort: Application Support captures
+    try:
+        from core.runtime import support_dir
+
+        fallback = support_dir() / "Captures"
+    except Exception:
+        fallback = Path.home() / "Library" / "Application Support" / "TGVideoSaver" / "Captures"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
 
 
 def safe_folder_name(name: str, fallback: str = "unknown") -> str:
