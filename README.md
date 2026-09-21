@@ -18,7 +18,7 @@ Download Telegram media (video / photo / documents) with a queue, history, chann
 
 | | |
 |---|---|
-| Version | **2.6.1** |
+| Version | **2.6.2** |
 | Platforms | **macOS 12+** · **Windows 10/11** |
 | Author | Kirill Kovyirshin (Ковыршин Кирилл) © 2016 |
 | Links | [3dwolf.ru](https://3dwolf.ru) · [datastore24.ru](https://datastore24.ru) · [myfabric.ru](https://myfabric.ru) |

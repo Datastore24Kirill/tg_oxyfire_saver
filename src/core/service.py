@@ -88,6 +88,20 @@ _PROXY_KEYS = {
 }
 
 
+def _complete_file(dest_dir: Path, stem: str, needed: int) -> Path | None:
+    """Уже лежащий файл без суффикса « (1)». Не качаем его второй раз."""
+    for path in dest_dir.glob(stem + ".*"):
+        if not path.is_file() or " (" in path.name:
+            continue
+        size = path.stat().st_size
+        if size <= 0:
+            continue
+        if needed and size + 4096 < needed:
+            continue
+        return path
+    return None
+
+
 def qr_data_url(url: str) -> str:
     img = qrcode.make(url, border=2, box_size=8)
     buf = io.BytesIO()
@@ -222,6 +236,7 @@ class DownloadService:
         self._proxy_error: str | None = None
         self._slot_cv: asyncio.Condition | None = None
         self._active_downloads = 0
+        self._inflight: set[tuple[str, int]] = set()
         self._restore_active_queue()
         self._restore_jobs_from_history()
 
@@ -448,6 +463,19 @@ class DownloadService:
         except (TypeError, ValueError):
             n = 2
         return max(1, min(5, n))
+
+    def _claim_download(self, pk: str, msg_id: int) -> bool:
+        """Один peer+msg качает только один поток. Второй альбомный job пропускает."""
+        key = (str(pk), int(msg_id))
+        with self._lock:
+            if key in self._inflight:
+                return False
+            self._inflight.add(key)
+            return True
+
+    def _release_download(self, pk: str, msg_id: int) -> None:
+        with self._lock:
+            self._inflight.discard((str(pk), int(msg_id)))
 
     def _api_credentials(self) -> tuple[int, str]:
         api_id = os.getenv("API_ID", "2040").strip() or "2040"
@@ -1037,6 +1065,14 @@ class DownloadService:
         self, peer: int | str, msg_id: int, url: str, source: str
     ) -> str | None:
         pk = peer_key(peer)
+        with self._lock:
+            for existing in self._jobs.values():
+                if (
+                    peer_key(existing.peer) == pk
+                    and int(existing.msg_id) == int(msg_id)
+                    and existing.status in ("queued", "downloading", "paused")
+                ):
+                    return existing.id
         if self.store.is_downloaded(pk, msg_id):
             job = Job(
                 id=uuid.uuid4().hex[:10],
@@ -1181,6 +1217,7 @@ class DownloadService:
                     messages = [msg]
 
             saved_any = False
+            skipped_existing = False
             last_path = None
             for m in messages:
                 if job.cancel_requested:
@@ -1192,97 +1229,122 @@ class DownloadService:
                 if not m.media:
                     continue
 
-                # дедуп каждой части альбома
-                if self.store.is_downloaded(peer_key(job.peer), m.id) and m.id != job.msg_id:
+                pk = peer_key(job.peer)
+                # Уже в истории — не качаем повторно, в том числе «своё» сообщение альбома.
+                if self.store.is_downloaded(pk, m.id):
+                    skipped_existing = True
+                    continue
+                if not self._claim_download(pk, m.id):
+                    skipped_existing = True
                     continue
 
-                await self._maybe_thumb(job, m)
-
-                self._ensure_writable_out_dir()
-                rollover_day_folders(self.out_dir)
-                dest_dir = channel_out_dir(self.out_dir, job.channel)
-                orig = original_name(m)
-                needed = 0
                 try:
-                    needed = int(getattr(getattr(m, "file", None), "size", 0) or 0)
-                except (TypeError, ValueError):
+                    await self._maybe_thumb(job, m)
+
+                    self._ensure_writable_out_dir()
+                    rollover_day_folders(self.out_dir)
+                    dest_dir = channel_out_dir(self.out_dir, job.channel)
+                    orig = original_name(m)
                     needed = 0
-                self._require_disk_space(dest_dir, needed)
-                # временное имя — Telethon сам поставит расширение
-                stem = build_filename(
-                    template=template,
-                    channel=job.channel,
-                    msg_id=m.id,
-                    caption=m.message or "",
-                    original=orig,
-                    media_type=mtype or "media",
-                    ext="",
-                )
-                # убрать возможное пустое расширение
-                stem = stem.rstrip(".")
-                out_base = dest_dir / stem
-                thumb_path = THUMBS / f"{peer_key(job.peer)}_{m.id}.jpg"
-
-                def progress(
-                    received: int,
-                    total: int,
-                    j=job,
-                    base=out_base,
-                    tp=thumb_path,
-                    mid=m.id,
-                ) -> None:
-                    if j.cancel_requested:
-                        raise asyncio.CancelledError()
-                    j.received_mb = received / 1e6
-                    j.total_mb = (total / 1e6) if total else 0
-                    j.progress = (100.0 * received / total) if total else 0.0
-                    # Кадр из частичного файла: рано (≈400КБ) и с ss=0
-                    if j.thumb:
-                        return
-                    last = getattr(j, "_thumb_try_at", 0)
-                    if received < 400_000 or received - last < 800_000:
-                        return
                     try:
-                        j._thumb_try_at = received  # type: ignore[attr-defined]
-                        candidates = list(base.parent.glob(base.name + ".*")) + (
-                            [base] if base.exists() else []
-                        )
-                        for cand in candidates:
-                            if cand.is_file() and cand.stat().st_size > 350_000:
-                                if thumb_from_video(cand, tp, partial=True):
-                                    j.thumb = thumb_data_url(j.peer, mid)
-                                break
-                    except Exception:
-                        pass
-
-                try:
-                    path = await self._client.download_media(
-                        m,
-                        file=str(out_base),
-                        progress_callback=progress,
+                        needed = int(getattr(getattr(m, "file", None), "size", 0) or 0)
+                    except (TypeError, ValueError):
+                        needed = 0
+                    self._require_disk_space(dest_dir, needed)
+                    stem = build_filename(
+                        template=template,
+                        channel=job.channel,
+                        msg_id=m.id,
+                        caption=m.message or "",
+                        original=orig,
+                        media_type=mtype or "media",
+                        ext="",
                     )
-                except asyncio.CancelledError:
-                    job.status = "cancelled"
-                    return
+                    stem = stem.rstrip(".")
+                    out_base = dest_dir / stem
+                    already = _complete_file(dest_dir, stem, needed)
+                    if already is not None:
+                        skipped_existing = True
+                        last_path = str(already)
+                        self.store.upsert_history(
+                            peer_key=pk,
+                            msg_id=m.id,
+                            channel=job.channel,
+                            media_type=mtype,
+                            path=str(already),
+                            url=job.url,
+                            status="done",
+                        )
+                        continue
 
-                if not path:
-                    continue
-                path_s = str(path)
-                last_path = path_s
-                job.media_type = mtype
-                job.path = path_s
-                saved_any = True
-                self.store.upsert_history(
-                    peer_key=peer_key(job.peer),
-                    msg_id=m.id,
-                    channel=job.channel,
-                    media_type=mtype,
-                    path=path_s,
-                    url=job.url,
-                    status="done",
-                )
+                    thumb_path = THUMBS / f"{pk}_{m.id}.jpg"
+
+                    def progress(
+                        received: int,
+                        total: int,
+                        j=job,
+                        base=out_base,
+                        tp=thumb_path,
+                        mid=m.id,
+                    ) -> None:
+                        if j.cancel_requested:
+                            raise asyncio.CancelledError()
+                        j.received_mb = received / 1e6
+                        j.total_mb = (total / 1e6) if total else 0
+                        j.progress = (100.0 * received / total) if total else 0.0
+                        if j.thumb:
+                            return
+                        last = getattr(j, "_thumb_try_at", 0)
+                        if received < 400_000 or received - last < 800_000:
+                            return
+                        try:
+                            j._thumb_try_at = received  # type: ignore[attr-defined]
+                            candidates = list(base.parent.glob(base.name + ".*")) + (
+                                [base] if base.exists() else []
+                            )
+                            for cand in candidates:
+                                if cand.is_file() and cand.stat().st_size > 350_000:
+                                    if thumb_from_video(cand, tp, partial=True):
+                                        j.thumb = thumb_data_url(j.peer, mid)
+                                    break
+                        except Exception:
+                            pass
+
+                    try:
+                        path = await self._client.download_media(
+                            m,
+                            file=str(out_base),
+                            progress_callback=progress,
+                        )
+                    except asyncio.CancelledError:
+                        job.status = "cancelled"
+                        return
+
+                    if not path:
+                        continue
+                    path_s = str(path)
+                    last_path = path_s
+                    job.media_type = mtype
+                    job.path = path_s
+                    saved_any = True
+                    self.store.upsert_history(
+                        peer_key=pk,
+                        msg_id=m.id,
+                        channel=job.channel,
+                        media_type=mtype,
+                        path=path_s,
+                        url=job.url,
+                        status="done",
+                    )
+                finally:
+                    self._release_download(pk, m.id)
 
             if not saved_any:
+                if skipped_existing:
+                    job.status = "skipped"
+                    job.error = "Уже скачано"
+                    job.path = last_path
+                    return
                 if detect_media_type(msg) is None:
                     raise RuntimeError("В сообщении нет медиа")
                 raise RuntimeError(

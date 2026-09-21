@@ -113,7 +113,65 @@ def channel_out_dir(base: Path, channel_name: str, when: date | None = None) -> 
     return path
 
 
+def _content_date(folder: Path) -> date | None:
+    """Дата большинства файлов в папке (по времени записи)."""
+    counts: dict[date, int] = {}
+    if not folder.is_dir():
+        return None
+    for path in folder.rglob("*"):
+        if not path.is_file() or path.name.startswith("."):
+            continue
+        day = datetime.fromtimestamp(path.stat().st_mtime).date()
+        counts[day] = counts.get(day, 0) + 1
+    if not counts:
+        return None
+    return max(counts, key=lambda day: (counts[day], day.toordinal()))
+
+
+def _name_for_date(day: date, today: date, yesterday: date) -> str:
+    if day == today:
+        return FOLDER_TODAY
+    if day == yesterday:
+        return FOLDER_YESTERDAY
+    return day.isoformat()
+
+
+def _merge_into(src: Path, dest: Path) -> None:
+    """Перенести src в dest. Если dest уже есть — сложить содержимое внутрь."""
+    if not src.exists():
+        return
+    if dest.exists() and src.resolve() == dest.resolve():
+        return
+    if not dest.exists():
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dest)
+        return
+    dest.mkdir(parents=True, exist_ok=True)
+    for item in list(src.iterdir()):
+        target = dest / item.name
+        if item.is_dir():
+            if target.exists() and target.is_dir():
+                _merge_into(item, target)
+                try:
+                    item.rmdir()
+                except OSError:
+                    pass
+            elif not target.exists():
+                item.rename(target)
+        elif not target.exists():
+            item.rename(target)
+    try:
+        src.rmdir()
+    except OSError:
+        pass
+
+
 def rollover_day_folders(base: Path) -> None:
+    """«Сегодня» / «Вчера» должны совпадать с датой файлов внутри.
+
+    Если папка не пустая, а файлы от другого дня — переименовать:
+    вчерашний день остаётся «Вчера», более старый становится YYYY-MM-DD.
+    """
     try:
         base.mkdir(parents=True, exist_ok=True)
     except PermissionError as e:
@@ -124,78 +182,34 @@ def rollover_day_folders(base: Path) -> None:
             "Или выбери другую папку в Настройках приложения."
         ) from e
 
-    marker = _day_marker_path(base)
     today = date.today()
     yesterday = today - timedelta(days=1)
-
-    prev: date | None = None
-    if marker.exists():
+    # Сначала «Вчера», чтобы имя освободилось для настоящей вчерашней папки.
+    for name, expected in (
+        (FOLDER_YESTERDAY, yesterday),
+        (FOLDER_TODAY, today),
+    ):
+        folder = base / name
+        if not folder.is_dir():
+            continue
+        content = _content_date(folder)
+        if content is None or content == expected:
+            continue
+        dest = base / _name_for_date(content, today, yesterday)
         try:
-            prev = date.fromisoformat(marker.read_text(encoding="utf-8").strip())
-        except ValueError:
-            prev = None
+            _merge_into(folder, dest)
+        except PermissionError as e:
+            raise PermissionError(
+                f"Нет доступа к папке сохранений «{base}». "
+                "Разреши Desktop в macOS или смени папку в Настройках."
+            ) from e
 
-    # Миграция: старый маркер лежал прямо в out_dir
-    legacy = base / ".download_day"
-    if prev is None and legacy.exists():
-        try:
-            prev = date.fromisoformat(legacy.read_text(encoding="utf-8").strip())
-        except Exception:
-            prev = None
-
-    if prev == today:
-        return
-
-    today_dir = base / FOLDER_TODAY
-    yesterday_dir = base / FOLDER_YESTERDAY
-
-    try:
-        if yesterday_dir.exists() and yesterday_dir.is_dir():
-            if prev is not None:
-                old_day = prev - timedelta(days=1)
-            else:
-                old_day = datetime.fromtimestamp(yesterday_dir.stat().st_mtime).date()
-                if old_day >= yesterday:
-                    old_day = yesterday - timedelta(days=1)
-            target = base / old_day.isoformat()
-            if target.exists():
-                for item in yesterday_dir.iterdir():
-                    dest = target / item.name
-                    if not dest.exists():
-                        item.rename(dest)
-                try:
-                    yesterday_dir.rmdir()
-                except OSError:
-                    pass
-            else:
-                yesterday_dir.rename(target)
-
-        if today_dir.exists() and today_dir.is_dir():
-            if yesterday_dir.exists():
-                stamp = (prev or today - timedelta(days=1)).isoformat()
-                spill = base / stamp
-                spill.mkdir(exist_ok=True)
-                for item in today_dir.iterdir():
-                    dest = spill / item.name
-                    if not dest.exists():
-                        item.rename(dest)
-                try:
-                    today_dir.rmdir()
-                except OSError:
-                    pass
-            else:
-                today_dir.rename(yesterday_dir)
-    except PermissionError as e:
-        raise PermissionError(
-            f"Нет доступа к папке сохранений «{base}». "
-            "Разреши Desktop в macOS или смени папку в Настройках."
-        ) from e
-
+    marker = _day_marker_path(base)
     try:
         marker.write_text(today.isoformat() + "\n", encoding="utf-8")
     except OSError:
         pass
-    # Убрать legacy-маркер с Desktop, если получится
+    legacy = base / ".download_day"
     try:
         if legacy.exists():
             legacy.unlink()

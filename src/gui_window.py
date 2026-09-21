@@ -51,7 +51,7 @@ def _app_version() -> str:
                     return line.lstrip("vV")
         except OSError:
             continue
-    return "2.6.1"
+    return "2.6.2"
 
 
 _APP_VERSION = _app_version()

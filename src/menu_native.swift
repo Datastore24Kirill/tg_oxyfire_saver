@@ -260,8 +260,8 @@ final class MenuApp: NSObject, NSApplicationDelegate {
         }
         var opts: [NSApplication.AboutPanelOptionKey: Any] = [
             .applicationName: "TG Oxyfire Saver",
-            .applicationVersion: "2.6.1",
-            .version: "2.6.1",
+            .applicationVersion: "2.6.2",
+            .version: "2.6.2",
             .credits: credits,
         ]
         let iconPath = support.appendingPathComponent("assets/icon.png").path
