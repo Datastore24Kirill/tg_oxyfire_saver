@@ -73,7 +73,7 @@ def api_alive(port: int) -> bool:
 
 
 def open_window(port: int) -> None:
-    # Без -n — не плодим окна и иконки в Dock
+    # Без -n — один экземпляр. Повторный open поднимает уже запущенное окно.
     subprocess.Popen(
         ["/usr/bin/open", str(WINDOW_APP), "--args", str(port)],
     )

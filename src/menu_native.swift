@@ -1,7 +1,7 @@
 import Cocoa
 import Foundation
 
-let appName = "TG Video Saver"
+let appName = "TG Oxyfire Saver"
 let support = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/TGVideoSaver")
 let logURL = support.appendingPathComponent("app.log")
@@ -260,8 +260,8 @@ final class MenuApp: NSObject, NSApplicationDelegate {
         }
         var opts: [NSApplication.AboutPanelOptionKey: Any] = [
             .applicationName: "TG Oxyfire Saver",
-            .applicationVersion: "2.6.0",
-            .version: "2.6.0",
+            .applicationVersion: "2.6.1",
+            .version: "2.6.1",
             .credits: credits,
         ]
         let iconPath = support.appendingPathComponent("assets/icon.png").path

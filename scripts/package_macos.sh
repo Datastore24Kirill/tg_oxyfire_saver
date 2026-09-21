@@ -53,6 +53,20 @@ fi
 
 ditto "$APP_SRC" "$WORK/dist/$APP_NAME"
 
+# Main executable must be "TG Oxyfire Saver", not the legacy "TG Video Saver".
+LAUNCHER_SRC="$ROOT/scripts/macos_main_launcher.swift"
+LAUNCHER_BIN="$WORK/dist/$APP_NAME/Contents/MacOS/TG Oxyfire Saver"
+if [[ -f "$LAUNCHER_SRC" ]] && command -v swiftc >/dev/null 2>&1; then
+  mkdir -p "$(dirname "$LAUNCHER_BIN")"
+  swiftc -O -o "$LAUNCHER_BIN" "$LAUNCHER_SRC"
+  rm -f "$WORK/dist/$APP_NAME/Contents/MacOS/TG Video Saver"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable TG Oxyfire Saver" \
+    "$WORK/dist/$APP_NAME/Contents/Info.plist" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string TG Oxyfire Saver" \
+      "$WORK/dist/$APP_NAME/Contents/Info.plist"
+  codesign --force --sign - "$LAUNCHER_BIN" >/dev/null 2>&1 || true
+fi
+
 rsync -a \
   --exclude '.venv' --exclude '__pycache__' --exclude '*.pyc' \
   --exclude '.env' --exclude '*.session' --exclude '*.session-journal' \

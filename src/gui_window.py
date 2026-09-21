@@ -51,10 +51,41 @@ def _app_version() -> str:
                     return line.lstrip("vV")
         except OSError:
             continue
-    return "2.6.0"
+    return "2.6.1"
 
 
 _APP_VERSION = _app_version()
+
+
+def _log_window(msg: str) -> None:
+    try:
+        from core.logutil import append_log
+
+        append_log(SUPPORT / "app.log", f"window: {msg}")
+    except Exception:
+        pass
+
+
+def reveal_window(window) -> None:
+    """Показать окно и вывести приложение на передний план."""
+    try:
+        window.show()
+    except Exception as e:
+        _log_window(f"show failed: {e}")
+    try:
+        from AppKit import NSApp, NSApplicationActivationPolicyRegular
+
+        NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+        NSApp.unhide_(None)
+        NSApp.activateIgnoringOtherApps_(True)
+        for w in list(NSApp.windows()):
+            try:
+                if w.canBecomeKeyWindow():
+                    w.makeKeyAndOrderFront_(None)
+            except Exception:
+                pass
+    except Exception as e:
+        _log_window(f"activate failed: {e}")
 
 
 def show_about_panel() -> None:
@@ -201,14 +232,13 @@ def _force_prefs() -> None:
 
 class ReopenDelegate(NSObject):
     window = None
-    bridge = None
 
     def applicationShouldHandleReopen_hasVisibleWindows_(self, _app, _flag):
         if self.window is not None:
-            try:
-                self.window.show()
-            except Exception:
-                pass
+            reveal_window(self.window)
+        return True
+
+    def applicationShouldTerminate_(self, _app):
         return True
 
     def showAbout_(self, _sender):
@@ -309,30 +339,8 @@ def main() -> None:
     base = f"http://127.0.0.1:{port}"
     wait_server(base)
 
-    try:
-        app = NSApplication.sharedApplication()
-        app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
-        reopen = ReopenDelegate.alloc().init()
-        app.setDelegate_(reopen)
-        # Меню приложения: О программе
-        main_menu = NSMenu.alloc().init()
-        app_menu_item = NSMenuItem.alloc().init()
-        main_menu.addItem_(app_menu_item)
-        app.setMainMenu_(main_menu)
-        app_menu = NSMenu.alloc().init()
-        about = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            f"О программе {APP}", "showAbout:", ""
-        )
-        about.setTarget_(reopen)
-        app_menu.addItem_(about)
-        app_menu_item.setSubmenu_(app_menu)
-    except Exception:
-        reopen = None
-
-    # Status item здесь — если helper заблокирован StatusKit
-    status_bridge = install_status_item(port)
-
     js_api = JsApi()
+    _log_window(f"creating window port={port}")
     window = webview.create_window(
         "TG Oxyfire Saver",
         url=base + "/",
@@ -344,21 +352,35 @@ def main() -> None:
         js_api=js_api,
     )
     js_api.window = window
-    if reopen is not None:
-        reopen.window = window
-        reopen.bridge = status_bridge
+    _log_window("window created")
 
     def on_closing() -> bool:
-        # Прячем, не убиваем — status item / helper остаются
-        try:
-            window.hide()
-        except Exception:
-            pass
-        return False
+        # Закрытие завершает процесс окна. Следующий клик по иконке
+        # запускает его заново и показывает экран. Прятать окно нельзя:
+        # Dock-иконка остаётся, а macOS не вызывает show() сама.
+        return True
 
     window.events.closing += on_closing
-    webview.start()
+
+    def on_started() -> None:
+        def _on_main() -> None:
+            reveal_window(window)
+            _log_window("revealed")
+
+        try:
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(_on_main)
+        except Exception as e:
+            _log_window(f"callAfter: {e}")
+            _on_main()
+
+    webview.start(func=on_started)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        _log_window(f"fatal: {e}")
+        raise
