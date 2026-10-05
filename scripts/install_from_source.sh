@@ -37,16 +37,21 @@ if ! grep -q '^API_ID=[0-9]' "$SUPPORT/.env" 2>/dev/null; then
   grep -E '^API_ID=|^API_HASH=' "$ROOT/.env.example" >> "$SUPPORT/.env"
 fi
 
-# Prefer python3.12
+# The shipped native helpers embed Python 3.12. Keep the same interpreter on update.
 PYTHON=""
-for c in python3.12 python3; do
-  if command -v "$c" >/dev/null 2>&1; then
-    PYTHON="$(command -v "$c")"
-    break
-  fi
-done
+if [[ -x "$SUPPORT/.venv/bin/python" ]]; then
+  PYTHON="$("$SUPPORT/.venv/bin/python" -c 'import sys; print(sys._base_executable if sys.version_info[:2] == (3,12) else "")' 2>/dev/null || true)"
+fi
 if [[ -z "$PYTHON" ]]; then
-  echo "ERROR: Python 3.12+ required. Install from https://www.python.org/ or brew install python@3.12"
+  for c in python3.12 python3; do
+    if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(sys.version_info[:2] != (3,12))'; then
+      PYTHON="$(command -v "$c")"
+      break
+    fi
+  done
+fi
+if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
+  echo "ERROR: This Mac bundle requires Python 3.12. The existing environment was not changed."
   exit 1
 fi
 
