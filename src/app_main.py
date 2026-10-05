@@ -11,6 +11,8 @@ import sys
 import threading
 import time
 import urllib.request
+
+LOCAL_HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 from datetime import datetime
 from pathlib import Path
 
@@ -66,7 +68,7 @@ def write_port(port: int) -> None:
 
 def api_alive(port: int) -> bool:
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1) as r:
+        with LOCAL_HTTP.open(f"http://127.0.0.1:{port}/api/health", timeout=1) as r:
             return r.status == 200
     except Exception:
         return False

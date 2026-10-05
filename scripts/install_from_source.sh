@@ -92,7 +92,7 @@ if [[ -d "$ROOT/dist/TG Oxyfire Saver.app" ]]; then
       # refresh pyvenv home line if present
       if [[ -f "$HAPP/Contents/pyvenv.cfg" ]]; then
         printf 'home = %s\nimplementation = CPython\nuv = 0\nversion_info = 3.12\ninclude-system-site-packages = false\n' \
-          "$SUPPORT/.venv/bin" > "$HAPP/Contents/pyvenv.cfg"
+          "$(dirname "$PYTHON")" > "$HAPP/Contents/pyvenv.cfg"
       fi
     fi
   done

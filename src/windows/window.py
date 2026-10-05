@@ -6,6 +6,8 @@ import subprocess
 import sys
 import time
 import urllib.request
+
+LOCAL_HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 import webbrowser
 from typing import Callable
 
@@ -14,7 +16,7 @@ def wait_server(url: str, timeout: float = 45) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            with urllib.request.urlopen(url + "/api/health", timeout=1) as r:
+            with LOCAL_HTTP.open(url + "/api/health", timeout=1) as r:
                 if r.status == 200:
                     return
         except Exception:

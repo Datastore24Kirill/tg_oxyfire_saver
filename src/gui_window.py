@@ -6,6 +6,8 @@ import subprocess
 import sys
 import time
 import urllib.request
+
+LOCAL_HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 from pathlib import Path
 
 import webview
@@ -196,7 +198,7 @@ def wait_server(url: str, timeout: float = 30) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            with urllib.request.urlopen(url + "/api/health", timeout=1) as r:
+            with LOCAL_HTTP.open(url + "/api/health", timeout=1) as r:
                 if r.status == 200:
                     return
         except Exception:
@@ -259,7 +261,7 @@ class StatusBridge(NSObject):
             import json
 
             base = f"http://127.0.0.1:{self.port}"
-            with urllib.request.urlopen(base + "/api/state", timeout=2) as r:
+            with LOCAL_HTTP.open(base + "/api/state", timeout=2) as r:
                 st = json.loads(r.read().decode())
             data = json.dumps({"paused": not bool(st.get("paused"))}).encode()
             req = urllib.request.Request(
@@ -268,7 +270,7 @@ class StatusBridge(NSObject):
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            urllib.request.urlopen(req, timeout=2)
+            LOCAL_HTTP.open(req, timeout=2)
         except Exception:
             pass
 
@@ -280,7 +282,7 @@ class StatusBridge(NSObject):
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            urllib.request.urlopen(req, timeout=2)
+            LOCAL_HTTP.open(req, timeout=2)
         except Exception:
             pass
 
@@ -299,7 +301,7 @@ class StatusBridge(NSObject):
         try:
             import json
 
-            with urllib.request.urlopen(
+            with LOCAL_HTTP.open(
                 f"http://127.0.0.1:{self.port}/api/state", timeout=2
             ) as r:
                 st = json.loads(r.read().decode())

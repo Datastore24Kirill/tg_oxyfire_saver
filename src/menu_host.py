@@ -9,6 +9,8 @@ import subprocess
 import sys
 import time
 import urllib.request
+
+LOCAL_HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 from pathlib import Path
 
 import rumps
@@ -180,7 +182,7 @@ def api(base: str, path: str, method: str = "GET", body: dict | None = None):
         data = json.dumps(body).encode("utf-8")
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(base + path, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=3) as r:
+    with LOCAL_HTTP.open(req, timeout=3) as r:
         return json.loads(r.read().decode("utf-8"))
 
 
@@ -189,7 +191,7 @@ def wait_api(port: int, timeout: float = 45) -> str:
     end = time.time() + timeout
     while time.time() < end:
         try:
-            with urllib.request.urlopen(base + "/api/health", timeout=1) as r:
+            with LOCAL_HTTP.open(base + "/api/health", timeout=1) as r:
                 if r.status == 200:
                     return base
         except Exception:
