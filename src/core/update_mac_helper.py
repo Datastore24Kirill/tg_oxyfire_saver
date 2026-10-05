@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 import tempfile
+import urllib.request
 
 
 def install(config):
@@ -61,4 +62,26 @@ if __name__=='__main__':
         Path(sys.argv[1]).with_suffix('.error.txt').write_text(str(error))
         raise
     finally:
-        if Path(config['target']).is_dir(): subprocess.run(['/usr/bin/open',config['target']],check=False)
+        if Path(config['target']).is_dir():
+            subprocess.run(['/usr/bin/open',config['target']],check=False)
+            opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            ready=False
+            for attempt in range(30):
+                try:
+                    port=int((Path(config['support'])/'.api_port').read_text())
+                    with opener.open(f'http://127.0.0.1:{port}/api/health',timeout=1) as response:
+                        ready=response.status==200
+                    if ready: break
+                except Exception: pass
+                time.sleep(1)
+            status=Path(config['support'])/'updates/last-result.json'
+            status.write_text(json.dumps({'ok':ready,'message':'Приложение запущено' if ready else 'Установка завершилась, но сервис не запустился. См. updates/last-install.log.'}))
+            print('RESTART_OK' if ready else 'RESTART_FAILED',flush=True)
+            if not ready:
+                try:
+                    from AppKit import NSAlert, NSApplication
+                    NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+                    alert=NSAlert.alloc().init();alert.setMessageText_('TG Saver не смог перезапуститься')
+                    alert.setInformativeText_('Сессия и файлы сохранены. Журнал: '+str(Path(config['support'])/'updates/last-install.log'))
+                    alert.addButtonWithTitle_('Понятно');alert.runModal()
+                except Exception: pass

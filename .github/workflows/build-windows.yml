@@ -69,3 +69,4 @@ jobs:
         with:
           files: dist/TG-Oxyfire-Saver-Windows.zip
           fail_on_unmatched_files: true
+          draft: true
