@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import platform
+import posixpath
 import re
 import shlex
 import shutil
@@ -43,7 +44,7 @@ def validate_zip(path):
                 target = archive.read(entry).decode('utf-8')
                 if target.startswith('/') or '\\' in target or ':' in target:
                     raise ValueError('Небезопасная ссылка в архиве')
-                resolved = os.path.normpath(str(PurePosixPath(name).parent / target))
+                resolved = posixpath.normpath(str(PurePosixPath(name).parent / target))
                 if resolved == '..' or resolved.startswith('../'):
                     raise ValueError('Ссылка выходит за пределы архива')
                 links.add(name.rstrip('/'))

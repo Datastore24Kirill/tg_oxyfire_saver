@@ -12,7 +12,7 @@ updater=importlib.util.module_from_spec(spec);spec.loader.exec_module(updater)
 
 class UpdateTests(unittest.TestCase):
     def test_archive_paths(self):
-        for name in ['../outside','/absolute','C:/file','a\\b']:
+        for name in ['../outside','/absolute','C:/file','a\\..\\..\\outside']:
             with tempfile.TemporaryDirectory() as root:
                 file=Path(root)/'bad.zip'
                 with zipfile.ZipFile(file,'w') as z: z.writestr(name,'bad')
