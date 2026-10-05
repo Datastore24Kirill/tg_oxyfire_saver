@@ -22,14 +22,16 @@ else
   PREV="$(mktemp -d)"
   echo "Downloading a previous Mac zip for the .app skeleton…"
   export CURRENT="${GITHUB_REF_NAME:-}"
+  AUTH=()
+  if [[ -n "${GH_TOKEN:-}" ]]; then AUTH=(-H "Authorization: Bearer $GH_TOKEN"); fi
   ASSET_URL="$(
-    curl -fsSL "https://api.github.com/repos/Datastore24Kirill/tg_oxyfire_saver/releases?per_page=20" \
+    curl -fsSL "${AUTH[@]}" "https://api.github.com/repos/Datastore24Kirill/tg_oxyfire_saver/releases?per_page=20" \
       | python3 -c '
 import json, os, sys
 cur = os.environ.get("CURRENT", "")
 rels = json.load(sys.stdin)
 for rel in rels:
-    if rel.get("tag_name") == cur:
+    if rel.get("draft") or rel.get("tag_name") == cur:
         continue
     for asset in rel.get("assets") or []:
         if asset.get("name") == "TG-Oxyfire-Saver-macOS.zip":
