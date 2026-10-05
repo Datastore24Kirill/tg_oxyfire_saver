@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SUPPORT="${HOME}/Library/Application Support/TGVideoSaver"
-APP_DEST="/Applications/TG Oxyfire Saver.app"
+APP_DEST="${TG_OXYFIRE_APP_DEST:-/Applications/TG Oxyfire Saver.app}"
 PY_MIN=3.12
 
 echo "=== TG Oxyfire Saver installer ==="

@@ -45,8 +45,8 @@ class UpdateController:
             if sys.platform == 'darwin':
                 from core.app_paths import find_app_bundle
                 target = find_app_bundle()
-                if target != Path('/Applications/TG Oxyfire Saver.app'):
-                    raise RuntimeError('Для обновления TG Saver должен находиться в /Applications/TG Oxyfire Saver.app.')
+                if target is None or not target.is_dir():
+                    raise RuntimeError('Не найдена установленная .app копия TG Saver.')
                 if not os.access(target.parent,os.W_OK): raise RuntimeError('Нет доступа к папке приложения.')
                 package = unpacked/'TG-Oxyfire-Saver-macOS'
                 installer=package/'scripts/install_from_source.sh'
