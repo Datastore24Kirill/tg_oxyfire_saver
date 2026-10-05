@@ -692,8 +692,21 @@ function bind() {
     await api("/settings", {method: "POST", body: {updates_skipped: updateVersion}});
     $("#updateBanner").hidden = true;
   });
-  $("#btnUpdate")?.addEventListener("click", () => {
-    if (updateUrl) openExternal(updateUrl);
+  $("#btnUpdate")?.addEventListener("click", async () => {
+    if (!confirm(t("update.confirm"))) return;
+    const result = await api("/update/install", {method:"POST", body:{}});
+    if (!result.ok) return toast(result.error || t("update.error"));
+    $("#btnUpdate").disabled = true;
+    const monitor = setInterval(async () => {
+      try {
+        const state = await api("/update/status");
+        $("#updateText").textContent = state.message;
+        if (!state.busy) {
+          clearInterval(monitor); $("#btnUpdate").disabled = false;
+          if (state.error) toast(state.error);
+        }
+      } catch (_) { clearInterval(monitor); }
+    }, 1000);
   });
   $("#btnWizFolder")?.addEventListener("click", async () => {
     let path = null;

@@ -17,6 +17,8 @@ def _gui_folder() -> Path:
 
 
 def create_app(service) -> Flask:
+    from core.update_control import UpdateController
+    updater = UpdateController(service)
     gui = _gui_folder()
     app = Flask(__name__, static_folder=str(gui), static_url_path="")
 
@@ -159,6 +161,17 @@ def create_app(service) -> Flask:
     @app.get("/api/update")
     def update_check():
         return jsonify(service.check_update(manual=request.args.get("manual") == "1"))
+
+    @app.post("/api/update/install")
+    def update_install():
+        # JSON + same-origin check prevents drive-by cross-origin form submissions.
+        if not request.is_json or request.headers.get("Origin") != request.host_url.rstrip('/'):
+            return jsonify({"ok": False, "error": "Invalid update origin"}), 403
+        return jsonify(updater.start())
+
+    @app.get("/api/update/status")
+    def update_status():
+        return jsonify(updater.status())
 
     @app.get("/api/health")
     def health():

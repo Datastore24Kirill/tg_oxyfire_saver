@@ -30,7 +30,7 @@ def select_release(items, repo, current, allow_preview=False):
         # Do not advertise a release until downloadable applications exist.
         assets = [a for a in item.get('assets', []) if a.get('name', '').endswith(('.zip', '.exe', '.dmg')) and a.get('size', 0) > 0]
         if assets:
-            candidates.append((number, {'latest': tag.lstrip('v'), 'url': url, 'preview': bool(item.get('prerelease'))}))
+            candidates.append((number, {'latest': tag.lstrip('v'), 'url': url, 'preview': bool(item.get('prerelease')), 'assets': assets}))
     return max(candidates, key=lambda c: c[0])[1] if candidates else None
 
 
