@@ -158,7 +158,7 @@ def create_app(service) -> Flask:
 
     @app.get("/api/update")
     def update_check():
-        return jsonify(service.check_update())
+        return jsonify(service.check_update(manual=request.args.get("manual") == "1"))
 
     @app.get("/api/health")
     def health():

@@ -26,6 +26,9 @@ jobs:
           python -m pip install -U pip
           pip install -r requirements-windows.txt
 
+      - name: Test release selection
+        run: python -m unittest discover -s tests -p test_releases.py -v
+
       - name: Build with PyInstaller
         run: |
           pyinstaller packaging/tg_oxyfire_saver_win.spec --noconfirm --clean

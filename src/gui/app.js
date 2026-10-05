@@ -50,6 +50,9 @@ let lastWatchMaster = null;
 let lastTg = "";
 let wizardOpen = false;
 let updateUrl = "";
+let updateVersion = "";
+let updateBusy = false;
+let updateLaterUntil = 0;
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
@@ -502,6 +505,7 @@ async function tick() {
   try {
     const state = await api("/state");
     showLogin(state);
+    if ($("#autoUpdates")) $("#autoUpdates").checked = state.settings?.updates_auto !== false;
     if (appVersionEl && state.version) appVersionEl.textContent = `v${state.version}`;
     if (aboutVersionEl && state.version) aboutVersionEl.textContent = `v${state.version}`;
     const tgEl = $("#tgStatus");
@@ -677,6 +681,17 @@ function bind() {
       toast(t("toast.import_fail"));
     }
   });
+  $("#btnCheckUpdate")?.addEventListener("click", () => checkUpdate(true));
+  $("#autoUpdates")?.addEventListener("change", async (event) => {
+    await api("/settings", {method: "POST", body: {updates_auto: event.target.checked}});
+  });
+  $("#btnUpdateLater")?.addEventListener("click", () => {
+    updateLaterUntil = Date.now() + 6 * 60 * 60 * 1000; $("#updateBanner").hidden = true;
+  });
+  $("#btnUpdateSkip")?.addEventListener("click", async () => {
+    await api("/settings", {method: "POST", body: {updates_skipped: updateVersion}});
+    $("#updateBanner").hidden = true;
+  });
   $("#btnUpdate")?.addEventListener("click", () => {
     if (updateUrl) openExternal(updateUrl);
   });
@@ -754,19 +769,25 @@ function bind() {
   setInterval(checkUpdate, 6 * 60 * 60 * 1000);
 }
 
-async function checkUpdate() {
+async function checkUpdate(manual = false) {
+  if (updateBusy || (!manual && Date.now() < updateLaterUntil)) return;
+  updateBusy = true;
   try {
-    const info = await api("/update");
+    const info = await api(manual ? "/update?manual=1" : "/update");
+    if (!info?.ok) { if (manual) toast(t("update.error")); return; }
     const banner = $("#updateBanner");
     if (!banner) return;
     if (info?.newer && info.url) {
       updateUrl = info.url;
+      updateVersion = info.latest;
       $("#updateText").textContent = `${t("update.available")}: v${info.latest}`;
       banner.hidden = false;
     } else {
       banner.hidden = true;
+      if (manual) toast(t("update.current"));
     }
-  } catch (_) {}
+  } catch (_) { if (manual) toast(t("update.error")); }
+  finally { updateBusy = false; }
 }
 
 window.I18N?.apply();

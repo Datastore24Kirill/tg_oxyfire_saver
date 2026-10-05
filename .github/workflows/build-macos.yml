@@ -16,6 +16,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Test release selection
+        run: python3 -m unittest discover -s tests -p test_releases.py -v
+
       - name: Package Mac zip
         run: bash scripts/package_macos.sh
 

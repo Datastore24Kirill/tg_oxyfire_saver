@@ -47,6 +47,7 @@ from core.paths import (
 )
 from core.store import Store
 from core.version import APP_VERSION, is_newer
+from core.releases import check_release
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -58,6 +59,8 @@ GITHUB_LATEST = (
     "https://api.github.com/repos/Datastore24Kirill/tg_oxyfire_saver/releases/latest"
 )
 _SETTINGS_KEYS = {
+    "updates_auto",
+    "updates_skipped",
     "media_filter",
     "filename_template",
     "clipboard_mode",
@@ -887,28 +890,17 @@ class DownloadService:
             asyncio.run_coroutine_threadsafe(self._setup_watchers(), self._loop)
         return {"ok": True, "settings": self.store.all_settings()}
 
-    def check_update(self) -> dict[str, Any]:
+    def check_update(self, manual=False) -> dict[str, Any]:
+        settings = self.store.all_settings()
+        if not manual and not settings.get("updates_auto", True):
+            return {"ok": True, "newer": False, "disabled": True}
         try:
-            req = urllib.request.Request(
-                GITHUB_LATEST,
-                headers={
-                    "Accept": "application/vnd.github+json",
-                    "User-Agent": "TGOxyfireSaver",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                payload = json.loads(resp.read().decode("utf-8"))
-            tag = str(payload.get("tag_name") or "").lstrip("vV")
-            url = str(payload.get("html_url") or "")
-            return {
-                "ok": True,
-                "current": APP_VERSION,
-                "latest": tag,
-                "url": url,
-                "newer": bool(tag) and is_newer(tag, APP_VERSION),
-            }
-        except Exception as e:  # noqa: BLE001
-            return {"ok": False, "current": APP_VERSION, "error": str(e), "newer": False}
+            info = check_release('Datastore24Kirill/tg_oxyfire_saver', APP_VERSION)
+            if info and not manual and settings.get("updates_skipped") == info['latest']:
+                info = None
+            return {"ok": True, "current": APP_VERSION, "newer": bool(info), **(info or {})}
+        except Exception:
+            return {"ok": False, "current": APP_VERSION, "error": "Release check unavailable", "newer": False}
 
     async def _reconnect_proxy(self) -> None:
         self._tg_status = "reconnecting"

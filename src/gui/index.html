@@ -104,7 +104,9 @@
     <main class="main">
       <div class="update-banner" id="updateBanner" hidden>
         <span id="updateText"></span>
-        <button class="btn tiny" id="btnUpdate" type="button" data-i18n="update.open">Открыть релиз</button>
+        <button class="btn tiny" id="btnUpdate" type="button" data-i18n="update.open">Обновиться</button>
+        <button class="btn tiny" id="btnUpdateLater" type="button" data-i18n="update.later">Позже</button>
+        <button class="btn tiny" id="btnUpdateSkip" type="button" data-i18n="update.skip">Пропустить версию</button>
       </div>
       <section class="tab" id="tab-queue">
         <header class="top">
@@ -263,6 +265,9 @@
               <a href="https://datastore24.ru" target="_blank" rel="noopener">datastore24.ru</a>
               <a href="https://myfabric.ru" target="_blank" rel="noopener">myfabric.ru</a>
             </p>
+            <button class="btn ghost" id="btnCheckUpdate" type="button" data-i18n="update.check">Проверить обновления</button>
+            <label class="switch-row"><span data-i18n="update.auto">Проверять обновления автоматически</span><input type="checkbox" id="autoUpdates" checked /></label>
+            <p class="hint" data-i18n="update.privacy">Проверка обращается к GitHub. Данные Telegram и файлы не отправляются.</p>
             <button class="btn ghost" id="btnAboutPanel" type="button" data-i18n="settings.about_panel">Окно «О программе»…</button>
           </div>
         </div>
