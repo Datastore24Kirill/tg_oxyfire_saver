@@ -54,9 +54,23 @@ let updateVersion = "";
 let updateBusy = false;
 let updateLaterUntil = 0;
 
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
+const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+let selectedTheme = "system";
+let themeSavePending = 0;
+let themeSaveQueue = Promise.resolve();
+function normalizeTheme(theme) {
+  return ["system", "light", "dark"].includes(theme) ? theme : "system";
 }
+function applyTheme(theme) {
+  selectedTheme = normalizeTheme(theme);
+  const resolved = selectedTheme === "system" ? (systemTheme.matches ? "dark" : "light") : selectedTheme;
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.style.colorScheme = resolved;
+}
+systemTheme.addEventListener("change", () => {
+  if (selectedTheme === "system") applyTheme("system");
+});
+applyTheme("system");
 
 function settingsPayload() {
   return {
@@ -66,7 +80,7 @@ function settingsPayload() {
     notify_on_done: $("#setNotify").checked,
     watch_hours: $("#setWatchHours").value.trim(),
     ui_lang: $("#setLang")?.value === "en" ? "en" : "ru",
-    ui_theme: $("#setTheme")?.value === "light" ? "light" : "dark",
+    ui_theme: normalizeTheme($("#setTheme")?.value),
     download_concurrency: Number($("#setConcurrency")?.value || 2),
     proxy_enabled: !!$("#setProxyOn")?.checked,
     proxy_type: $("#setProxyType")?.value || "socks5",
@@ -457,13 +471,13 @@ async function loadHistory() {
 function fillSettings(s) {
   if (!s) return;
   applyLangFromSettings(s);
-  applyTheme(s.ui_theme);
+  if (!themeSavePending) applyTheme(s.ui_theme);
   $("#setFilter").value = s.media_filter || "video";
   $("#setTemplate").value = s.filename_template || "{channel}_{id}_{type}";
   $("#setOutDir").value = s.out_dir || "";
   $("#setNotify").checked = !!s.notify_on_done;
   $("#setWatchHours").value = s.watch_hours || "";
-  if ($("#setTheme")) $("#setTheme").value = s.ui_theme === "light" ? "light" : "dark";
+  if ($("#setTheme") && !themeSavePending) $("#setTheme").value = normalizeTheme(s.ui_theme);
   if ($("#setConcurrency")) $("#setConcurrency").value = String(s.download_concurrency || 2);
   if ($("#setProxyOn")) $("#setProxyOn").checked = !!s.proxy_enabled;
   if ($("#setProxyType")) $("#setProxyType").value = s.proxy_type || "socks5";
@@ -570,7 +584,7 @@ async function tick() {
       if (wiz && state.settings && !state.settings.onboarding_done && !wizardOpen) {
         wizardOpen = true;
         $("#wizLang").value = state.settings.ui_lang === "en" ? "en" : "ru";
-        $("#wizTheme").value = state.settings.ui_theme === "light" ? "light" : "dark";
+        $("#wizTheme").value = normalizeTheme(state.settings.ui_theme);
         $("#wizFolder").value = state.out_dir || state.settings.out_dir || "";
         wiz.hidden = false;
         window.I18N?.apply();
@@ -655,7 +669,14 @@ function bind() {
     applyTheme($("#setTheme")?.value);
     toast(t("toast.saved"));
   });
-  $("#setTheme")?.addEventListener("change", () => applyTheme($("#setTheme").value));
+  $("#setTheme")?.addEventListener("change", () => {
+    const theme = normalizeTheme($("#setTheme").value);
+    applyTheme(theme); themeSavePending++;
+    themeSaveQueue = themeSaveQueue.then(async () => {
+      const result = await api("/settings", {method: "POST", body: {ui_theme: theme}});
+      if (!result.ok) throw new Error("Theme save failed");
+    }).catch(() => toast(t("settings.theme_error"))).finally(() => { themeSavePending--; });
+  });
   $("#btnExport")?.addEventListener("click", async () => {
     const data = await api("/settings/export");
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -721,7 +742,7 @@ function bind() {
   $("#wizTheme")?.addEventListener("change", () => applyTheme($("#wizTheme").value));
   $("#btnWizDone")?.addEventListener("click", async () => {
     const lang = $("#wizLang").value === "en" ? "en" : "ru";
-    const theme = $("#wizTheme").value === "light" ? "light" : "dark";
+    const theme = normalizeTheme($("#wizTheme").value);
     window.I18N.setLang(lang);
     applyTheme(theme);
     const body = {

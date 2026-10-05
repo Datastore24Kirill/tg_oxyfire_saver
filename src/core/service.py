@@ -823,7 +823,7 @@ class DownloadService:
             if k == "ui_lang":
                 v = "en" if str(v).lower().startswith("en") else "ru"
             if k == "ui_theme":
-                v = "light" if str(v).lower() == "light" else "dark"
+                v = str(v).lower() if str(v).lower() in ("system", "light", "dark") else "system"
             if k == "download_concurrency":
                 try:
                     v = max(1, min(5, int(v)))
