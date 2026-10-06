@@ -38,8 +38,22 @@ jobs:
           name: TG-Oxyfire-Saver-macOS
           path: dist/TG-Oxyfire-Saver-macOS.zip
 
-      - name: Attach to GitHub Release (on tag)
+      - name: Preserve published release assets
+        id: release_state
         if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft' 2>/dev/null || echo missing)"
+          if [ "$state" = "false" ]; then
+            echo "draft_allowed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "draft_allowed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Attach to GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/') && steps.release_state.outputs.draft_allowed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/TG-Oxyfire-Saver-macOS.zip
