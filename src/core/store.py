@@ -21,7 +21,7 @@ DEFAULT_SETTINGS = {
     "notify_on_done": True,
     # Расписание сторожа: пусто = всегда; иначе "9-22" (локальные часы)
     "watch_hours": "",
-    "ui_lang": "ru",  # ru|en
+    "ui_lang": "system",  # system|ru|en
     "ui_theme": "system",  # system|dark|light
     "onboarding_done": False,
     "download_concurrency": 2,  # 1..5

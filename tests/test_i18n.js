@@ -1,0 +1,13 @@
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const context = {window: {addEventListener(){}},navigator:{languages:['en-US'],language:'en-US'},document:{documentElement:{lang:''},querySelectorAll(){return [];}}};
+vm.createContext(context);vm.runInContext(fs.readFileSync('src/gui/i18n.js','utf8'),context);
+const i18n=context.window.I18N;
+i18n.setLang('system');assert.equal(i18n.lang,'en');assert.equal(i18n.preference,'system');
+context.navigator.languages=['ru-RU'];i18n.setLang('system');assert.equal(i18n.lang,'ru');
+i18n.setLang('en');assert.equal(i18n.lang,'en');assert.equal(i18n.preference,'en');
+i18n.setLang('ru');assert.equal(i18n.lang,'ru');
+for (const key of Object.keys(i18n.dict.ru)) assert.ok(i18n.dict.en[key],`Missing English: ${key}`);
+for (const key of Object.keys(i18n.dict.en)) assert.ok(i18n.dict.ru[key],`Missing Russian: ${key}`);
+console.log('UI language tests passed');

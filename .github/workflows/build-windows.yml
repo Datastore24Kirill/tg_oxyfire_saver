@@ -26,6 +26,12 @@ jobs:
           python -m pip install -U pip
           pip install -r requirements-windows.txt
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test UI language
+        run: node tests/test_i18n.js
+
       - name: Test release selection
         run: |
           python -m unittest discover -s tests -p test_releases.py -v

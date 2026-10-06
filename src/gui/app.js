@@ -79,7 +79,7 @@ function settingsPayload() {
     out_dir: $("#setOutDir").value,
     notify_on_done: $("#setNotify").checked,
     watch_hours: $("#setWatchHours").value.trim(),
-    ui_lang: $("#setLang")?.value === "en" ? "en" : "ru",
+    ui_lang: ["ru", "en"].includes($("#setLang")?.value) ? $("#setLang")?.value : "system",
     ui_theme: normalizeTheme($("#setTheme")?.value),
     download_concurrency: Number($("#setConcurrency")?.value || 2),
     proxy_enabled: !!$("#setProxyOn")?.checked,
@@ -128,8 +128,8 @@ function statusLabel(s) {
 }
 
 function applyLangFromSettings(s) {
-  const lang = s?.ui_lang === "en" ? "en" : "ru";
-  if (window.I18N.lang !== lang) {
+  const lang = ["ru", "en"].includes(s?.ui_lang) ? s?.ui_lang : "system";
+  if (window.I18N.preference !== lang || window.I18N.lang !== window.I18N.resolveLanguage(lang)) {
     window.I18N.setLang(lang);
     lastPauseLabel = "";
     lastQueueKey = "";
@@ -583,7 +583,7 @@ async function tick() {
       const wiz = $("#wizard");
       if (wiz && state.settings && !state.settings.onboarding_done && !wizardOpen) {
         wizardOpen = true;
-        $("#wizLang").value = state.settings.ui_lang === "en" ? "en" : "ru";
+        $("#wizLang").value = ["ru", "en"].includes(state.settings.ui_lang) ? state.settings.ui_lang : "system";
         $("#wizTheme").value = normalizeTheme(state.settings.ui_theme);
         $("#wizFolder").value = state.out_dir || state.settings.out_dir || "";
         wiz.hidden = false;
@@ -656,7 +656,7 @@ function bind() {
     historyTimer = setTimeout(loadHistory, 250);
   });
   $("#setLang")?.addEventListener("change", async () => {
-    const lang = $("#setLang").value === "en" ? "en" : "ru";
+    const lang = ["ru", "en"].includes($("#setLang").value) ? $("#setLang").value : "system";
     window.I18N.setLang(lang);
     lastPauseLabel = "";
     lastQueueKey = "";
@@ -737,11 +737,11 @@ function bind() {
     if (path) $("#wizFolder").value = path;
   });
   $("#wizLang")?.addEventListener("change", () => {
-    window.I18N.setLang($("#wizLang").value === "en" ? "en" : "ru");
+    window.I18N.setLang(["ru", "en"].includes($("#wizLang").value) ? $("#wizLang").value : "system");
   });
   $("#wizTheme")?.addEventListener("change", () => applyTheme($("#wizTheme").value));
   $("#btnWizDone")?.addEventListener("click", async () => {
-    const lang = $("#wizLang").value === "en" ? "en" : "ru";
+    const lang = ["ru", "en"].includes($("#wizLang").value) ? $("#wizLang").value : "system";
     const theme = normalizeTheme($("#wizTheme").value);
     window.I18N.setLang(lang);
     applyTheme(theme);

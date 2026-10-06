@@ -821,7 +821,7 @@ class DownloadService:
             if k not in _SETTINGS_KEYS:
                 continue
             if k == "ui_lang":
-                v = "en" if str(v).lower().startswith("en") else "ru"
+                v = str(v).lower() if str(v).lower() in ("system", "ru", "en") else "system"
             if k == "ui_theme":
                 v = str(v).lower() if str(v).lower() in ("system", "light", "dark") else "system"
             if k == "download_concurrency":

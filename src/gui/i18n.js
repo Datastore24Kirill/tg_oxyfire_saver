@@ -1,6 +1,11 @@
 /* TG Oxyfire Saver — UI strings (ru default, en) */
 window.I18N = {
   lang: "ru",
+  preference: "system",
+  resolveLanguage(value) {
+    if (value === "ru" || value === "en") return value;
+    return (navigator.languages?.[0] || navigator.language || "en").toLowerCase().startsWith("ru") ? "ru" : "en";
+  },
   dict: {
     ru: {
       "login.title": "Привязка устройства",
@@ -60,6 +65,7 @@ window.I18N = {
       "history.empty": "История пуста",
       "settings.title": "Настройки",
       "settings.language": "Язык интерфейса",
+      "settings.lang_system": "Системный (авто)",
       "settings.lang_ru": "Русский",
       "settings.lang_en": "English",
       "settings.filter": "Фильтр медиа",
@@ -232,6 +238,7 @@ window.I18N = {
       "history.empty": "History is empty",
       "settings.title": "Settings",
       "settings.language": "Interface language",
+      "settings.lang_system": "System (automatic)",
       "settings.lang_ru": "Русский",
       "settings.lang_en": "English",
       "settings.filter": "Media filter",
@@ -352,7 +359,8 @@ window.I18N = {
     return d[key] ?? this.dict.ru[key] ?? key;
   },
   setLang(lang) {
-    this.lang = lang === "en" ? "en" : "ru";
+    this.preference = ["ru", "en"].includes(lang) ? lang : "system";
+    this.lang = this.resolveLanguage(this.preference);
     document.documentElement.lang = this.lang;
     this.apply();
   },
@@ -374,3 +382,7 @@ window.I18N = {
 };
 
 window.t = (key) => window.I18N.t(key);
+
+window.addEventListener("languagechange", () => {
+  if (window.I18N.preference === "system") window.I18N.setLang("system");
+});

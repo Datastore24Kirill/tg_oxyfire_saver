@@ -123,3 +123,9 @@ MIT — see [LICENSE](LICENSE)
 ### Тема оформления
 
 В настройках выберите «Системная (авто)», «Светлая» или «Тёмная». Выбор применяется и сохраняется сразу. Системная тема следует настройкам ОС, ручная остаётся неизменной. Ранее выбранная светлая или тёмная тема сохраняется после обновления.
+
+### Interface language / Язык интерфейса
+
+Settings now offers **System (automatic), Русский, English**. The system option follows the primary browser/WebView language; manual choices remain fixed. The selected preference is saved separately from the resolved language. Existing manual language preferences are preserved.
+
+В настройках доступны **Системный (авто), Русский, English**. Автовыбор использует основной язык браузера/WebView; ручной выбор сохраняется независимо от языка системы.
