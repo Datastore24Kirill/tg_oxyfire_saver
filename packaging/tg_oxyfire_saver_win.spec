@@ -11,6 +11,7 @@ ROOT = Path(SPECPATH).resolve().parent
 SRC = ROOT / "src"
 
 datas = [
+    (str(ROOT / "VERSION"), "."),
     (str(SRC / "gui"), "gui"),
     (str(SRC / "assets"), "assets"),
     (str(ROOT / ".env.example"), "."),
