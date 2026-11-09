@@ -337,10 +337,26 @@ def install_status_item(port: int) -> StatusBridge | None:
 
 
 def main() -> None:
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+    if len(sys.argv) > 1:
+        port = int(sys.argv[1])
+    else:
+        try:
+            port = int((SUPPORT / ".api_port").read_text().strip())
+        except (OSError, ValueError):
+            port = 8765
     base = f"http://127.0.0.1:{port}"
     wait_server(base)
 
+    # WKWebView may lose its content process while the Python window survives.
+    # Preserve pywebview's delegate and reload only after that explicit event.
+    from webview.platforms.cocoa import BrowserView
+
+    class RecoveringBrowserDelegate(BrowserView.BrowserDelegate):
+        def webViewWebContentProcessDidTerminate_(self, view):
+            _log_window("WebKit content process terminated; reloading interface")
+            view.reload()
+
+    BrowserView.BrowserDelegate = RecoveringBrowserDelegate
     js_api = JsApi()
     _log_window(f"creating window port={port}")
     window = webview.create_window(
