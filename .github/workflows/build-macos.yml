@@ -20,12 +20,15 @@ jobs:
         with:
           node-version: "22"
       - name: Test UI language
-        run: node tests/test_i18n.js
+        run: |
+          node tests/test_i18n.js
+          node tests/test_queue_order.js
 
       - name: Test release selection
         run: |
           python3 -m unittest discover -s tests -p test_releases.py -v
           python3 -m unittest discover -s tests -p test_updater.py -v
+          python3 -m unittest discover -s tests -p test_update_retry.py -v
 
       - name: Package Mac zip
         env:

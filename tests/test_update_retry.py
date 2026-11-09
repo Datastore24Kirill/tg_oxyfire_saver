@@ -3,8 +3,11 @@ from pathlib import Path
 import unittest
 from unittest.mock import Mock
 from urllib.error import HTTPError
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from core.update_retry import retry_network
+import importlib.util
+spec = importlib.util.spec_from_file_location('update_retry', Path(__file__).resolve().parents[1] / 'src/core/update_retry.py')
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+retry_network = module.retry_network
 
 class RetryTests(unittest.TestCase):
     def test_recovers_from_gateway_timeout(self):
