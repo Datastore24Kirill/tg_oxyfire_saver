@@ -1,0 +1,12 @@
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const source = fs.readFileSync('src/gui/app.js','utf8');
+const context = vm.createContext({});
+vm.runInContext(source.slice(source.indexOf('function orderQueue('),source.indexOf('function renderQueue(')),context);
+const jobs = [{id:'1',status:'done'},{id:'2',status:'queued'},{id:'3',status:'downloading'},{id:'4',status:'paused'},{id:'5',status:'error'}];
+assert.deepEqual(Array.from(context.orderQueue(jobs),j=>j.id),['4','2','3','5','1']);
+assert.equal(jobs[0].id,'1');
+jobs[1].status='done';
+assert.deepEqual(Array.from(context.orderQueue(jobs),j=>j.id),['4','3','5','2','1']);
+console.log('Queue ordering tests passed');

@@ -12,6 +12,7 @@ from core.releases import check_release
 from core.runtime import support_dir
 from core.version import APP_VERSION
 from core.updater import download, stage_replacement, launch_swap
+from core.update_retry import retry_network
 
 
 class UpdateController:
@@ -33,10 +34,10 @@ class UpdateController:
         try:
             if sys.platform == 'win32' and not getattr(sys,'frozen',False):
                 raise RuntimeError('Запустите установленную сборку приложения.')
-            info = check_release('Datastore24Kirill/tg_oxyfire_saver', APP_VERSION)
+            info = retry_network(lambda: check_release('Datastore24Kirill/tg_oxyfire_saver', APP_VERSION), self.message)
             if not info: raise RuntimeError('Новой готовой версии нет.')
             cache = support_dir()/'updates'
-            unpacked = download(info,'Datastore24Kirill/tg_oxyfire_saver','saver',cache,self.message)
+            unpacked = retry_network(lambda: download(info,'Datastore24Kirill/tg_oxyfire_saver','saver',cache,self.message), self.message)
             self.service.set_paused(True)
             self.message('Обновление готово. Ожидаю завершения активных загрузок…')
             time.sleep(1)  # Allow the queue worker to observe pause before inspecting active jobs.

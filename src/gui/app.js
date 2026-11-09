@@ -246,12 +246,18 @@ async function onPassword() {
   }
 }
 
+function orderQueue(jobs) {
+  const priority = {paused: 0, queued: 0, downloading: 1, error: 2, cancelled: 2, skipped: 2, done: 3};
+  return [...jobs].reverse().sort((a, b) =>
+    (priority[a.status] ?? 2) - (priority[b.status] ?? 2));
+}
+
 function renderQueue(jobs) {
   emptyEl.style.display = jobs.length ? "none" : "block";
-  const ordered = [...jobs].reverse();
+  const ordered = orderQueue(jobs);
   const seen = new Set();
 
-  for (const job of ordered) {
+  for (const [position, job] of ordered.entries()) {
     seen.add(job.id);
     let card = queueEl.querySelector(`[data-job-id="${job.id.replace(/"/g, "")}"]`);
     const mb =
@@ -279,7 +285,7 @@ function renderQueue(jobs) {
         <div class="badge"></div>
       </div>
       <div class="card-actions"></div>`;
-      queueEl.prepend(card);
+      queueEl.appendChild(card);
     }
 
     // Превью: обновлять когда появилось / сменилось
@@ -337,6 +343,11 @@ function renderQueue(jobs) {
         );
       }
       actions.append(btn(t("btn.remove"), () => api("/job/remove", { method: "POST", body: { id: job.id } })));
+    }
+
+    // Move existing cards too when their status changes, without recreating controls.
+    if (queueEl.children[position] !== card) {
+      queueEl.insertBefore(card, queueEl.children[position] || null);
     }
 
     // Клик по превью → Finder для готовых
@@ -721,7 +732,7 @@ function bind() {
     const monitor = setInterval(async () => {
       try {
         const state = await api("/update/status");
-        $("#updateText").textContent = state.message;
+        $("#updateText").textContent = state.error ? `${state.message}: ${state.error}` : state.message;
         if (!state.busy) {
           clearInterval(monitor); $("#btnUpdate").disabled = false;
           if (state.error) toast(state.error);
