@@ -491,6 +491,8 @@ class DownloadService:
         return int(api_id), api_hash
 
     def _make_client(self) -> TelegramClient:
+        from core.telethon_cdn import install_cdn_sender_fix
+        install_cdn_sender_fix()
         api_id, api_hash = self._api_credentials()
         kwargs = telethon_proxy_kwargs(self.store.all_settings())
         return TelegramClient(

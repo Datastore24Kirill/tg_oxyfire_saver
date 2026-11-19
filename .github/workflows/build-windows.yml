@@ -39,6 +39,7 @@ jobs:
           python -m unittest discover -s tests -p test_releases.py -v
           python -m unittest discover -s tests -p test_updater.py -v
           python -m unittest discover -s tests -p test_update_retry.py -v
+          python -m unittest discover -s tests -p test_cdn_sender.py -v
 
       - name: Build with PyInstaller
         run: |
